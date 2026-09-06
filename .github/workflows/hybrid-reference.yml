@@ -24,6 +24,18 @@ jobs:
       - run: uv run --locked mypy hybrid
       - run: uv run --locked pytest -q
       - run: uv export --locked --no-dev --no-emit-project --format requirements-txt > requirements.lock
+      - name: Record resolved public dependency lock for source review
+        run: |
+          python - <<'PYLOCK'
+          import base64, json, zlib
+          from pathlib import Path
+          data = json.dumps({name: Path(name).read_text() for name in ['uv.lock', 'requirements.lock']}).encode()
+          encoded = base64.b64encode(zlib.compress(data, 9)).decode()
+          print('JARVIS_LOCK_BEGIN')
+          for start in range(0, len(encoded), 4000):
+              print('JARVIS_LOCK_CHUNK:' + encoded[start:start+4000])
+          print('JARVIS_LOCK_END')
+          PYLOCK
       - uses: actions/upload-artifact@v4
         with:
           name: hybrid-locked-dependencies
@@ -31,3 +43,22 @@ jobs:
             examples/hybrid/uv.lock
             examples/hybrid/requirements.lock
       - run: docker build -t jarvis-hybrid-reference .
+      - name: Prepare isolated CI credentials
+        run: |
+          cat > .env <<'ENV'
+          OWNER=casa01
+          API_TOKEN=ci-only-api-token-not-for-deployment-0123456789
+          NEO4J_PASSWORD=ci-only-database-password
+          MQTT_PASSWORD=ci-only-mqtt-password
+          ENV
+          docker run --rm -v "$PWD/mosquitto:/mosquitto/config" eclipse-mosquitto:2.0 mosquitto_passwd -b -c /mosquitto/config/passwords jarvis ci-only-mqtt-password
+          docker run --rm -v "$PWD/mosquitto:/mosquitto/config" eclipse-mosquitto:2.0 mosquitto_passwd -b /mosquitto/config/passwords bridge ci-only-mqtt-password
+          sudo chmod 644 mosquitto/passwords
+      - run: docker compose up -d --wait --wait-timeout 180
+      - run: docker compose exec -T agent python - < tests/smoke_compose.py
+      - name: Container diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=80
+      - name: Remove isolated test services
+        if: always()
+        run: docker compose down -v
