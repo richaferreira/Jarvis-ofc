@@ -1,0 +1,4 @@
+# Python 3.11/3.12, 64 bits. Instalação completa.
+# Para CPU, instale torch pelo índice oficial CPU antes deste arquivo (README).
+-r requirements-core.txt
+-r requirements-ml.txt
