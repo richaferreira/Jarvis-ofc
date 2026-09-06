@@ -18,24 +18,12 @@ jobs:
         with:
           python-version: '3.11'
       - run: python -m pip install uv==0.10.0
-      - run: uv lock
+      - run: uv lock --check
       - run: uv sync --locked
       - run: uv run --locked python -m compileall -q hybrid
       - run: uv run --locked mypy hybrid
       - run: uv run --locked pytest -q
       - run: uv export --locked --no-dev --no-emit-project --format requirements-txt > requirements.lock
-      - name: Record resolved public dependency lock for source review
-        run: |
-          python - <<'PYLOCK'
-          import base64, json, zlib
-          from pathlib import Path
-          data = json.dumps({name: Path(name).read_text() for name in ['uv.lock', 'requirements.lock']}).encode()
-          encoded = base64.b64encode(zlib.compress(data, 9)).decode()
-          print('JARVIS_LOCK_BEGIN')
-          for start in range(0, len(encoded), 4000):
-              print('JARVIS_LOCK_CHUNK:' + encoded[start:start+4000])
-          print('JARVIS_LOCK_END')
-          PYLOCK
       - uses: actions/upload-artifact@v4
         with:
           name: hybrid-locked-dependencies

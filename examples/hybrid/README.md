@@ -55,19 +55,19 @@ O broker permite leitura apenas ao usuário `jarvis`; `bridge` publica telemetri
 
 ## Instalação e dependências com uv
 
-Na pasta `examples/hybrid`, instale uv e gere o lockfile com acesso ao índice:
+Na pasta `examples/hybrid`, instale uv. O `uv.lock` e o `requirements.lock` entregues foram resolvidos no CI e estão versionados. Use:
 
 ```bash
-uv lock
+uv lock --check
 uv sync --locked
 uv run --locked mypy hybrid
 uv run --locked pytest -q
 uv export --locked --no-dev --no-emit-project --format requirements-txt > requirements.lock
 ```
 
-`uv.lock` registra versões, fontes e hashes disponíveis; `uv sync --locked` verifica se o manifesto exige alteração do lock. Não confundir com `--frozen`, que pula essa verificação. O export inclui hashes por padrão e pode ser instalado por pip com `--require-hashes`. Versione `uv.lock` após revisão. Ele é gerado no CI e disponibilizado como artefato; a referência não inventa um arquivo de hashes antes da resolução real.
+`uv.lock` registra versões, fontes e hashes disponíveis; `uv sync --locked` verifica se o manifesto exige alteração do lock. Não confundir com `--frozen`, que pula essa verificação. O export inclui hashes por padrão e pode ser instalado por pip com `--require-hashes`. Para atualizar dependências intencionalmente, execute `uv lock --upgrade`, revise o diff e versione o novo lock. O CI verifica que o manifesto e o lock continuam coerentes.
 
-O Dockerfile requer `uv.lock` na pasta: execute o comando acima ou obtenha o artefato do CI antes do build. Para implantação rigorosa, mantenha o lock revisado no repositório, faça o CI validar com `uv lock --check` e fixe digests das imagens. As tags do Compose delimitam versões, mas não tornam imagens imutáveis.
+O Dockerfile utiliza o `uv.lock` incluído nesta pasta. Para implantação rigorosa, preserve o lock revisado e fixe também os digests das imagens. As tags do Compose delimitam versões, mas não tornam imagens imutáveis.
 
 Embeddings são produzidos via Ollama, evitando adicionar PyTorch/Whisper ao container do agente. Antes de iniciar:
 
@@ -134,3 +134,9 @@ Cada resposta possui `generation`. Ao detectar fala, o cliente deve parar playba
 - https://docs.astral.sh/uv/guides/integration/docker/
 - https://docs.astral.sh/uv/concepts/projects/export/
 - https://mosquitto.org/documentation/authentication-methods/
+
+## Validação realizada
+
+Mypy em modo estrito aprovou os oito módulos Python. Cinco testes verificaram roteamento, expansão semântica/topológica, streaming LangGraph, duplicatas/freshness MQTT e cancelamento de geração. Um teste de integração adicional subiu os quatro serviços reais do Docker Compose e confirmou consultas Neo4j/Chroma com filtro de proprietário, evento publicado no Mosquitto chegando ao WebSocket e recebimento do controle de interrupção. O teste usou embeddings de fixture, telemetria artificial e credenciais efêmeras de CI; não acionou hardware físico nem consultou um LLM real.
+
+Evidência inicial da integração: https://github.com/richaferreira/Jarvis-ofc/actions/runs/34040518340
