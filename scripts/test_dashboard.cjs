@@ -1,0 +1,16 @@
+const {chromium}=require('playwright');
+const fs=require('fs');const http=require('http');const path=require('path');
+(async()=>{
+const root=path.resolve(__dirname,'../app/web');
+const server=http.createServer((req,res)=>{let file=req.url==='/'?'index.html':req.url.replace('/assets/','');if(!['index.html','style.css','app.js'].includes(file)){res.writeHead(404);return res.end();}res.setHeader('Content-Type',file.endsWith('.js')?'application/javascript':file.endsWith('.css')?'text/css':'text/html');res.end(fs.readFileSync(path.join(root,file)));});
+await new Promise(r=>server.listen(8766,'127.0.0.1',r));
+const browser=await chromium.launch({headless:true,channel:'chrome'});const page=await browser.newPage({viewport:{width:1600,height:1080}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+await page.route('**/system/status',route=>route.fulfill({json:{model:'qwen3:8b',provider:'ollama',memory_enabled:true,timezone:'America/Sao_Paulo',max_input_chars:4000,home_actions:[],status:'missing_model',message:'Modelo não instalado neste Ollama. Execute ollama pull qwen3:8b.'}}));
+await page.route('**/chat',route=>route.fulfill({json:{text:'<img src=x onerror=alert(1)> Resposta de teste.',pending_actions:[],warnings:[]}}));
+await page.goto('http://127.0.0.1:8766');await page.fill('#token','test-token-01234567890123456789012345');await page.locator('#auth button').first().click();await page.waitForFunction(()=>document.querySelector('#core-state').textContent==='MODELO AUSENTE');
+await page.screenshot({path:'jarvis-dashboard-desktop.png',fullPage:true});
+await page.fill('#prompt','Olá');await page.click('#send');await page.waitForSelector('.bubble.assistant');if(await page.locator('#messages img').count())throw Error('Unsafe model HTML');
+await page.setViewportSize({width:390,height:844});await page.screenshot({path:'jarvis-dashboard-mobile.png',fullPage:true});
+if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow');
+if(errors.length)throw Error(errors.join('\n'));console.log('PASS: authentication, diagnostic state, chat, HTML escaping, mobile overflow, no JS errors');await browser.close();server.close();
+})().catch(e=>{console.error(e);process.exit(1)});
