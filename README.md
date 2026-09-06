@@ -204,3 +204,24 @@ O padrão escuta apenas localhost, com um worker. Este modo integra a
 inicialização: o WebSocket híbrido ainda não compartilha a memória buffer,
 as ferramentas de ação ou o pipeline de voz da aplicação desktop.
 A instalação por wheel sem `examples/hybrid` não oferece esse modo.
+
+## Central de comando Windows
+
+Abra `JARVIS.bat` na raiz do checkout completo. O painel ciano sobre fundo
+preto oferece instalacao automatizada da `.venv`, configuracao, modos voz,
+texto e API, dispositivos de audio, gerenciamento do Compose hibrido e
+diagnostico sem exibir segredos. A instalacao cria `.env` apenas quando
+ausente; preencha o provedor e as credenciais antes de iniciar o assistente.
+
+Use Python 3.11 ou 3.12. Voz requer FFmpeg/ffplay no PATH e microfone.
+O hibrido requer Docker Desktop com conteineres Linux, configuracao de
+segredos e usuarios do broker conforme `examples/hybrid/README.md`.
+O painel nao instala ferramentas do sistema nem baixa modelos Ollama.
+A opcao P para os conteineres preservando os volumes. Fechar o painel
+nao encerra servicos Docker. Ctrl+C durante o assistente pode pedir a
+confirmacao padrao do Windows para encerrar o arquivo em lotes.
+
+`JARVIS.bat --help` mostra a ajuda; `JARVIS.bat --check` executa somente
+o diagnostico. Seu codigo zero indica que o diagnostico executou, nao
+que todos os requisitos estao instalados. O painel tambem funciona quando
+iniciado de outra pasta, pois usa a localizacao do proprio arquivo.
