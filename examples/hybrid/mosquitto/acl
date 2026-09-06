@@ -1,0 +1,5 @@
+user jarvis
+topic read jarvis/casa01/devices/+/state
+
+user bridge
+topic write jarvis/casa01/devices/+/state
