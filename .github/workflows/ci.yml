@@ -1,7 +1,7 @@
 name: Validate JARVIS
 on:
   push:
-    branches: [main]
+    branches: [main, architecture/hybrid-realtime]
   pull_request:
   workflow_dispatch:
 permissions:

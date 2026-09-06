@@ -41,3 +41,20 @@ def test_api_refuses_missing_auth_token(settings):
     settings.api_token = None
     with pytest.raises(ValueError, match="API_TOKEN"):
         create_app(settings)
+
+
+async def test_dashboard_assets_and_status_auth(settings, monkeypatch):
+    async def inspect(_):
+        return {'status': 'missing_model', 'model': 'test-model'}
+    monkeypatch.setattr('app.api.server.inspect_provider', inspect)
+    app = create_app(settings)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        page = await client.get('/')
+        assert page.status_code == 200
+        assert 'lang="pt-BR"' in page.text
+        assert "frame-ancestors 'none'" in page.headers['content-security-policy']
+        assert settings.api_token.get_secret_value() not in page.text
+        assert (await client.get('/assets/app.js')).status_code == 200
+        assert (await client.get('/system/status')).status_code == 401
+        status = await client.get('/system/status', headers={'Authorization': f'Bearer {settings.api_token.get_secret_value()}'})
+        assert status.json()['status'] == 'missing_model'

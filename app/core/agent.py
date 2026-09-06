@@ -12,6 +12,7 @@ from langgraph.graph import END, START, StateGraph
 from app.config import Settings
 from app.core.contracts import ChatModel, MemoryBackend
 from app.core.prompts import SYSTEM_PROMPT
+from app.core.provider_diagnostics import provider_error
 from app.core.schemas import ChatResponse
 from app.exceptions import BusyError, JarvisError, ServiceUnavailable
 from app.memory.conversation import ConversationBuffer
@@ -145,7 +146,7 @@ class JarvisAgent:
             raise
         except Exception as exc:
             logger.error("agent_turn_failed", error_type=type(exc).__name__)
-            raise ServiceUnavailable("Não foi possível concluir a resposta. Verifique a conexão, o provedor e o modelo configurado.") from exc
+            raise ServiceUnavailable(provider_error(exc, self.settings)) from exc
         finally:
             self._gate.release()
 

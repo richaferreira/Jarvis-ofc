@@ -18,7 +18,7 @@ echo     [1] INSTALAR AMBIENTE        Nucleo + voz + memoria local
 echo     [2] CONFIGURAR DESKTOP      Criar ou editar .env
 echo     [3] INICIAR VOZ             Microfone + Whisper + TTS
 echo     [4] INICIAR TEXTO           Console de conversacao
-echo     [5] INICIAR API             Servidor autenticado
+echo     [5] INTERFACE WEB           Painel visual em PT-BR
 echo     [6] DISPOSITIVOS DE AUDIO   Listar entradas e saidas
 echo.
 echo     [7] CONFIGURAR HIBRIDO      Editar .env e abrir guia MQTT
@@ -118,6 +118,8 @@ if errorlevel 1 goto back
 ".venv\Scripts\python.exe" -m app.main --mode text
 goto process_return
 :api
+echo     Apos iniciar, abra http://127.0.0.1:8000 no navegador.
+echo     Configure API_TOKEN no .env e use a mesma chave no painel.
 call :need_env
 if errorlevel 1 goto back
 ".venv\Scripts\python.exe" -m app.main --mode api

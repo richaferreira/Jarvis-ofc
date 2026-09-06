@@ -14,4 +14,4 @@ class LocalEmbeddings:
 
     def encode(self, text: str) -> list[float]:
         """Return normalized vectors for consistent cosine retrieval."""
-        return self.model.encode(text, normalize_embeddings=True).tolist()
+        return self.model.encode(text, normalize_embeddings=True, show_progress_bar=False).tolist()

@@ -2,13 +2,17 @@
 
 import asyncio
 import hmac
+from pathlib import Path
 from collections.abc import Callable
 from contextlib import asynccontextmanager
 from typing import Any
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
+
+from app.core.provider_diagnostics import inspect_provider
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -131,5 +135,19 @@ def create_app(settings: Settings | None = None,
         async with asyncio.timeout(settings.turn_timeout + 1):
             await request.app.state.runtime.agent.clear(owner, session_id)
         return {"status": "cleared"}
+
+    assets = Path(__file__).resolve().parents[1] / "web"
+    app.mount("/assets", StaticFiles(directory=assets), name="assets")
+
+    @app.get("/", include_in_schema=False)
+    async def dashboard() -> FileResponse:
+        return FileResponse(assets / "index.html", headers={
+            "Content-Security-Policy": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'",
+            "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff",
+        })
+
+    @app.get("/system/status")
+    async def system_status(owner: str = Depends(authenticate)) -> dict[str, object]:
+        return await inspect_provider(settings)
 
     return app

@@ -225,3 +225,28 @@ confirmacao padrao do Windows para encerrar o arquivo em lotes.
 o diagnostico. Seu codigo zero indica que o diagnostico executou, nao
 que todos os requisitos estao instalados. O painel tambem funciona quando
 iniciado de outra pasta, pois usa a localizacao do proprio arquivo.
+
+## Interface visual em português
+
+A opção 5 do `JARVIS.bat` inicia a API com o painel visual. Configure
+`API_TOKEN` no `.env` (pelo menos 32 caracteres aleatórios), abra
+`http://127.0.0.1:8000` e conecte-se com esse token. Se alterar API_HOST ou
+API_PORT, use o endereço correspondente. O token permanece apenas na memória
+da página; recarregar exige reconectar. O painel não edita arquivos de segredos.
+
+A interface oferece conversa real, preferências persistentes, limpeza de sessão,
+confirmação de ações domésticas e diagnóstico do inventário Ollama. Modelo
+instalado não significa inferência validada. Os indicadores nunca simulam
+CPU, agentes ou conexões inexistentes. As respostas HTTP aparecem completas;
+streaming GraphRAG continua no serviço híbrido separado.
+
+Ditado e leitura em voz alta usam recursos opcionais do navegador, não o
+Whisper/Edge-TTS do desktop. O ditado pode usar processamento online e pede
+consentimento antes de ativar. A interface é responsiva e respeita a preferência
+de movimento reduzido. Não é uma implementação de áudio full-duplex.
+
+Se houver ResponseError, teste `ollama list` e `ollama run qwen3:8b`. O painel
+consulta `/api/tags` pelo servidor e diferencia modelo ausente de serviço
+inacessível; chamadas ao modelo apresentam mensagens próprias para 400, 404,
+5xx e timeout, sem revelar prompts ou credenciais do provedor. O aviso de
+HF_TOKEN no primeiro download de embeddings não implica falha do Ollama.
