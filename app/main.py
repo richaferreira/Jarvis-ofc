@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import re
 import sys
+import threading
 
 import structlog
 from pydantic import ValidationError
@@ -23,10 +24,26 @@ def terminal_text(text: str) -> str:
 
 async def console_input(prompt: str) -> str:
     """Read console input off the event loop; EOF requests an orderly exit."""
-    try:
-        return await asyncio.to_thread(input, prompt)
-    except EOFError:
-        return "/exit"
+    loop = asyncio.get_running_loop()
+    future: asyncio.Future[str] = loop.create_future()
+
+    def deliver(value: str) -> None:
+        if not future.done():
+            future.set_result(value)
+
+    def read() -> None:
+        try:
+            value = input(prompt)
+        except (EOFError, OSError):
+            value = "/exit"
+        try:
+            loop.call_soon_threadsafe(deliver, value)
+        except RuntimeError:
+            pass  # The application already shut down while the terminal was waiting.
+
+    # Do not put interactive input into asyncio's executor: shutdown would wait for Enter.
+    threading.Thread(target=read, name="console-input", daemon=True).start()
+    return await future
 
 
 async def handle_command(runtime: Runtime, text: str, session: str) -> bool:
