@@ -11,6 +11,6 @@ await page.goto('http://127.0.0.1:8766');await page.fill('#token','test-token-01
 await page.screenshot({path:'jarvis-dashboard-desktop.png',fullPage:true});
 await page.fill('#prompt','Olá');await page.click('#send');await page.waitForSelector('.bubble.assistant');if(await page.locator('#messages img').count())throw Error('Unsafe model HTML');
 await page.setViewportSize({width:390,height:844});await page.screenshot({path:'jarvis-dashboard-mobile.png',fullPage:true});
-if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow');
+if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow: '+await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).filter(e=>e.getBoundingClientRect().right>innerWidth).map(e=>e.tagName+'.'+e.className).join(', ')));
 if(errors.length)throw Error(errors.join('\n'));console.log('PASS: authentication, diagnostic state, chat, HTML escaping, mobile overflow, no JS errors');await browser.close();server.close();
 })().catch(e=>{console.error(e);process.exit(1)});
