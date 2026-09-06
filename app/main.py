@@ -1,20 +1,18 @@
 """Asynchronous CLI entry point: voice loop, text console or authenticated API."""
 
+from __future__ import annotations
+
 import argparse
 import asyncio
 import re
 import sys
 import threading
 
-import structlog
-from pydantic import ValidationError
+from typing import TYPE_CHECKING
 
-from app.config import Settings
-from app.exceptions import JarvisError
-from app.logging_config import configure_logging
-from app.runtime import Runtime
-
-logger = structlog.get_logger()
+if TYPE_CHECKING:
+    from app.config import Settings
+    from app.runtime import Runtime
 
 
 def terminal_text(text: str) -> str:
@@ -73,6 +71,9 @@ async def handle_command(runtime: Runtime, text: str, session: str) -> bool:
 
 async def run_console(settings: Settings, voice: bool) -> None:
     """Listen, transcribe, reason and play sequentially to avoid hearing our own speech."""
+    from app.exceptions import JarvisError
+    from app.runtime import Runtime
+
     runtime = await Runtime.create(settings)
     try:
         if voice:
@@ -129,9 +130,26 @@ async def run_console(settings: Settings, voice: bool) -> None:
 def main() -> None:
     """Parse options before constructing any expensive service."""
     parser = argparse.ArgumentParser(description="J.A.R.V.I.S. — assistente pessoal")
-    parser.add_argument("--mode", choices=("voice", "text", "api"), default="voice")
+    parser.add_argument("--mode", choices=("voice", "text", "api", "hybrid"), default="voice")
     parser.add_argument("--list-devices", action="store_true", help="Listar dispositivos de áudio e sair")
+    parser.add_argument("--hybrid-host", default="127.0.0.1")
+    parser.add_argument("--hybrid-port", type=int, default=8000)
     args = parser.parse_args()
+    if args.mode == "hybrid":
+        if args.list_devices:
+            parser.error("--list-devices não se aplica ao modo hybrid")
+        from app.hybrid_launcher import launch
+
+        raise SystemExit(launch(host=args.hybrid_host, port=args.hybrid_port))
+
+    import structlog
+    from pydantic import ValidationError
+
+    from app.config import Settings
+    from app.exceptions import JarvisError
+    from app.logging_config import configure_logging
+
+    logger = structlog.get_logger()
     try:
         if args.list_devices:
             import sounddevice as sd

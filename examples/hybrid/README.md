@@ -140,3 +140,13 @@ Cada resposta possui `generation`. Ao detectar fala, o cliente deve parar playba
 Mypy em modo estrito aprovou os oito módulos Python. Cinco testes verificaram roteamento, expansão semântica/topológica, streaming LangGraph, duplicatas/freshness MQTT e cancelamento de geração. Um teste de integração adicional subiu os quatro serviços reais do Docker Compose e confirmou consultas Neo4j/Chroma com filtro de proprietário, evento publicado no Mosquitto chegando ao WebSocket e recebimento do controle de interrupção. O teste usou embeddings de fixture, telemetria artificial e credenciais efêmeras de CI; não acionou hardware físico nem consultou um LLM real.
 
 Evidência inicial da integração: https://github.com/richaferreira/Jarvis-ofc/actions/runs/34040518340
+
+### Entrada pelo comando principal
+
+A partir da raiz do checkout, `python -m app.main --mode hybrid` inicia este
+serviço com `uv run --locked --no-dev`, sem carregar as dependências desktop.
+Use `--hybrid-host` e `--hybrid-port` para alterar o bind (padrão
+`127.0.0.1:8000`). O `.env` lido é o deste diretório. As conexões precisam
+ser alcançáveis a partir do host; o Compose completo não publica os bancos
+ou broker. Não execute simultaneamente dois agentes na mesma porta.
+Essa entrada não incorpora STT/TTS nem ferramentas do runtime v1.

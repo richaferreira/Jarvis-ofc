@@ -23,6 +23,9 @@ jobs:
       - run: uv run --locked python -m compileall -q hybrid
       - run: uv run --locked mypy hybrid
       - run: uv run --locked pytest -q
+      - run: uv run --locked ruff check ../../app
+      - run: python -S -m app.main --help
+        working-directory: .
       - run: uv export --locked --no-dev --no-emit-project --format requirements-txt > requirements.lock
       - uses: actions/upload-artifact@v4
         with:

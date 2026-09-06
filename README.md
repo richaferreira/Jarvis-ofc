@@ -181,3 +181,26 @@ Os testes exercitam o grafo LangGraph real com modelo falso determinístico, con
 - [DDGS](https://pypi.org/project/ddgs/) — cliente de terceiros, sujeito a bloqueios e limites; não é uma API oficial DuckDuckGo com SLA.
 - [Open-Meteo](https://open-meteo.com/en/docs) — observe atribuição, limites e condições aplicáveis ao seu uso, especialmente comercial.
 - [Home Assistant REST](https://developers.home-assistant.io/docs/api/rest/)
+
+## Inicialização do núcleo híbrido
+
+Na branch `architecture/hybrid-realtime`, o checkout completo oferece um novo modo:
+
+```bash
+python -m pip install uv==0.10.0
+python -m app.main --mode hybrid --hybrid-host 127.0.0.1 --hybrid-port 8000
+```
+
+Prepare antes `examples/hybrid/.env` e os serviços conforme o
+[guia híbrido](examples/hybrid/README.md). O comando usa o `uv.lock` desse
+subprojeto e lê seu `.env`; não precisa instalar Whisper ou as dependências
+da aplicação desktop. Para executar o agente fora do Docker, configure nesse
+`.env` os endereços alcançáveis do ChromaDB, Neo4j, MQTT e Ollama. Os nomes
+`chroma`, `neo4j` e `mqtt` da rede Compose não são resolvidos pelo host.
+O Compose completo continua sendo a opção pronta para a rede interna.
+
+O processo mantém o código de saída do serviço e encerra com Ctrl+C.
+O padrão escuta apenas localhost, com um worker. Este modo integra a
+inicialização: o WebSocket híbrido ainda não compartilha a memória buffer,
+as ferramentas de ação ou o pipeline de voz da aplicação desktop.
+A instalação por wheel sem `examples/hybrid` não oferece esse modo.
