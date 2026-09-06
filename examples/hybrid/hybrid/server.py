@@ -35,7 +35,7 @@ def create_model(settings: Settings) -> BaseChatModel:
         if settings.openai_api_key is None:
             raise ValueError("OPENAI_API_KEY ausente.")
         return ChatOpenAI(model=settings.llm_model, api_key=settings.openai_api_key,
-                          streaming=True, timeout=30, max_retries=0, max_tokens=1024)
+                          streaming=True, timeout=30, max_retries=0, max_completion_tokens=1024)
     if settings.llm_provider == "gemini":
         from langchain_google_genai import ChatGoogleGenerativeAI
 

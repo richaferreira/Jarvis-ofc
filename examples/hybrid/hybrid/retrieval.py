@@ -34,7 +34,7 @@ class ChromaRepository:
     async def search(self, owner: str, query: str) -> list[VectorHit]:
         vector = await self.embeddings.aembed_query(query)
         result = await self.collection.query(
-            query_embeddings=[vector], n_results=4, where={"owner": owner},
+            query_embeddings=vector, n_results=4, where={"owner": owner},
             include=["documents", "metadatas", "distances"])
         documents = (result["documents"] or [[]])[0]
         metadatas = (result["metadatas"] or [[]])[0]
@@ -52,7 +52,7 @@ class ChromaRepository:
         # Chamado apenas por ingestão confiável, nunca por Cypher/texto gerado pelo LLM.
         vector = await self.embeddings.aembed_query(text)
         scoped_id = hashlib.sha256(f"{owner}\0{document_id}".encode()).hexdigest()
-        await self.collection.upsert(ids=[scoped_id], documents=[text], embeddings=[vector],
+        await self.collection.upsert(ids=[scoped_id], documents=[text], embeddings=vector,
                                      metadatas=[{"owner": owner, "entity_id": entity_id}])
 
 

@@ -17,6 +17,7 @@ dev = ["pytest>=8.3,<10", "pytest-asyncio>=1,<2", "mypy>=1.15,<2", "ruff>=0.12,<
 package = false
 
 [tool.mypy]
+plugins = ["pydantic.mypy"]
 python_version = "3.11"
 strict = true
 files = ["hybrid"]
