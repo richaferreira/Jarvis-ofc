@@ -11,11 +11,13 @@ class Settings(BaseSettings):
     owner: str = Field(default="casa01", pattern=r"^[a-z0-9_-]{1,40}$")
     api_token: SecretStr = Field(min_length=32)
     origins: list[str] = ["http://localhost:3000"]
-    llm_provider: Literal["openai", "gemini", "ollama"] = "ollama"
+    llm_provider: Literal["openai", "gemini", "ollama", "omniroute"] = "ollama"
     llm_model: str = "qwen3:8b"
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
     ollama_url: str = "http://host.docker.internal:11434"
+    omniroute_base_url: str = "http://host.docker.internal:20128/v1"
+    omniroute_api_key: SecretStr | None = None
     embedding_model: str = "embeddinggemma"
     chroma_host: str = "chroma"
     chroma_port: int = 8000

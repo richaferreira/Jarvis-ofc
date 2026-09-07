@@ -29,6 +29,15 @@ class ClientFrame(BaseModel):
 
 
 def create_model(settings: Settings) -> BaseChatModel:
+    if settings.llm_provider == "omniroute":
+        from langchain_openai import ChatOpenAI
+
+        if not settings.omniroute_api_key or not settings.omniroute_api_key.get_secret_value():
+            raise ValueError("OMNIROUTE_API_KEY ausente.")
+        return ChatOpenAI(model=settings.llm_model, api_key=settings.omniroute_api_key,
+                          base_url=settings.omniroute_base_url, streaming=True,
+                          timeout=30, max_retries=0, max_completion_tokens=1024,
+                          use_responses_api=False)
     if settings.llm_provider == "openai":
         from langchain_openai import ChatOpenAI
 

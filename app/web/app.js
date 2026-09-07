@@ -1,6 +1,15 @@
 'use strict';
 const $ = id => document.getElementById(id);
 let token = '', session = crypto.randomUUID(), busy = false, epoch = 0, turns = 0;
+let catalog = [];
+function renderCatalog() {
+  const term = $('model-filter').value.toLocaleLowerCase('pt-BR');
+  $('catalog').replaceChildren();
+  const visible = catalog.filter(id => id.toLocaleLowerCase('pt-BR').includes(term));
+  if (!visible.length) { const empty=document.createElement('small'); empty.textContent='Nenhum modelo listado. Confira a configuração e consulte o diagnóstico.'; $('catalog').append(empty); }
+  for (const id of visible) { const row=document.createElement('div'); row.className='tool'; const name=document.createElement('code'); name.textContent=id; row.append(name); $('catalog').append(row); }
+}
+$('model-filter').addEventListener('input', renderCatalog);
 let zone = 'America/Sao_Paulo';
 function notice(text) { $('notice').textContent = text; }
 function event(text) {
@@ -29,17 +38,18 @@ async function status() {
   const current = epoch;
   try {
     const data = await api('/system/status'); if (current !== epoch) return;
+    catalog = data.provider === 'omniroute' ? (data.models || []) : []; renderCatalog();
     $('model').textContent = data.model; $('provider').textContent = data.provider;
     $('memory-status').textContent = data.memory_enabled ? 'Ativada' : 'Desativada';
     $('prompt').maxLength = data.max_input_chars; zone = data.timezone;
-    $('core-state').textContent = data.status === 'available' ? 'MODELO INSTALADO' : data.status === 'missing_model' ? 'MODELO AUSENTE' : data.status === 'unavailable' ? 'PROVEDOR INDISPONÍVEL' : 'PROVEDOR CONFIGURADO';
+    $('core-state').textContent = data.status === 'available' ? (data.provider === 'omniroute' ? 'GATEWAY ACESSÍVEL' : 'MODELO INSTALADO') : data.status === 'missing_model' ? 'MODELO AUSENTE' : data.status === 'unavailable' ? 'PROVEDOR INDISPONÍVEL' : 'PROVEDOR CONFIGURADO';
     $('home').textContent = data.home_actions.length ? data.home_actions.join(' · ') : 'Nenhuma ação configurada no .env.';
     event(data.message);
   } catch (error) { if (current === epoch) { $('core-state').textContent = 'CONEXÃO NÃO VALIDADA'; event(error.message); } }
 }
 $('auth').addEventListener('submit', e => { e.preventDefault(); if (busy) return notice('Aguarde a resposta antes de reconectar.'); epoch++; token = $('token').value.trim(); $('token').value = ''; status(); });
 $('disconnect').addEventListener('click', () => {
-  epoch++; token = ''; session = crypto.randomUUID(); turns = 0;
+  epoch++; token = ''; catalog = []; renderCatalog(); session = crypto.randomUUID(); turns = 0;
   $('turns').textContent = '0 respostas'; $('messages').replaceChildren(); $('pending').replaceChildren(); $('events').replaceChildren();
   $('model').textContent = 'Aguardando conexão'; $('provider').textContent = 'Não consultado';
   $('memory-status').textContent = 'Não consultada'; $('core-state').textContent = 'DESCONECTADO';

@@ -250,3 +250,45 @@ consulta `/api/tags` pelo servidor e diferencia modelo ausente de serviço
 inacessível; chamadas ao modelo apresentam mensagens próprias para 400, 404,
 5xx e timeout, sem revelar prompts ou credenciais do provedor. O aviso de
 HF_TOKEN no primeiro download de embeddings não implica falha do Ollama.
+
+## OmniRoute: múltiplos provedores pelo mesmo gateway
+
+Integração com https://github.com/diegosouzapw/OmniRoute pelo protocolo
+OpenAI Chat Completions. Instale o gateway seguindo as instruções oficiais
+(`npm install -g omniroute`, com Node compatível), execute `omniroute` em
+outro terminal e abra http://127.0.0.1:20128. Conecte seus provedores e
+configure um modelo ou combo com suporte a ferramentas. Gere uma chave em
+Endpoints no painel do gateway. Os custos, cotas, permissões e disponibilidade
+continuam sendo os de cada provedor.
+
+No `.env` da raiz, edite as linhas existentes (não duplique):
+
+```dotenv
+LLM_PROVIDER=omniroute
+LLM_MODEL=ID_EXATO_DO_MODELO_OU_COMBO
+OMNIROUTE_BASE_URL=http://127.0.0.1:20128/v1
+OMNIROUTE_API_KEY=CHAVE_GERADA_NO_GATEWAY
+API_TOKEN=TOKEN_PROPRIO_DO_JARVIS_COM_PELO_MENOS_32_CARACTERES
+```
+
+`API_TOKEN` autentica o navegador no Jarvis. `OMNIROUTE_API_KEY` autentica
+o Jarvis no gateway; nunca é enviada ao navegador. As chaves dos provedores
+ficam cadastradas no OmniRoute. O painel Jarvis exibe o catálogo autenticado
+e permite filtrá-lo; copie o ID desejado para `LLM_MODEL` e reinicie.
+Criar conexões, editar combos e gerenciar credenciais ocorre no painel
+OmniRoute. Não há troca de configuração global durante uma conversa.
+
+O agente usa as mesmas ferramentas e confirmação de ações. O gateway
+controla os fallbacks configurados; o cliente Jarvis não adiciona retries.
+A consulta de catálogo não prova que uma inferência funciona. Teste uma
+conversa depois de conectar os provedores.
+
+Para o serviço híbrido, configure o `.env` em `examples/hybrid`, usando
+`http://host.docker.internal:20128/v1` quando o gateway roda no host e é
+alcançável pelo contêiner. Os embeddings híbridos ainda usam Ollama; mudar
+o provedor de chat não muda o modelo vetorial.
+
+Se o navegador mostrar conexão recusada, o servidor não está acessível no
+endereço informado. Inicie a opção 5 e aguarde a mensagem do Uvicorn.
+API_TOKEN ausente ou curto agora produz uma explicação direta no terminal.
+Não feche a janela do servidor enquanto usa o painel.
