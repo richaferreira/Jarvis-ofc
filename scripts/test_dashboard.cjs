@@ -10,6 +10,10 @@ await page.route('**/chat',route=>route.fulfill({json:{text:'<img src=x onerror=
 await page.goto('http://127.0.0.1:8766');await page.fill('#token','test-token-01234567890123456789012345');await page.locator('#auth button').first().click();await page.waitForFunction(()=>document.querySelector('#core-state').textContent==='MODELO AUSENTE');
 await page.screenshot({path:'jarvis-dashboard-desktop.png',fullPage:true});
 await page.fill('#prompt','Olá');await page.click('#send');await page.waitForSelector('.bubble.assistant');if(await page.locator('#messages img').count())throw Error('Unsafe model HTML');
+await page.unroute('**/system/status');
+await page.route('**/system/status',route=>route.fulfill({json:{model:'combo-casa',provider:'omniroute',memory_enabled:true,timezone:'America/Sao_Paulo',max_input_chars:4000,home_actions:[],status:'available',models:['provider/model-a','provider/model-b'],message:'Catálogo disponível.'}}));
+await page.click('#refresh');await page.waitForFunction(()=>document.querySelector('#core-state').textContent==='GATEWAY ACESSÍVEL');
+await page.fill('#model-filter','model-b');if(await page.locator('#catalog code').count()!==1)throw Error('Catalog filter failed');
 await page.setViewportSize({width:390,height:844});await page.screenshot({path:'jarvis-dashboard-mobile.png',fullPage:true});
 if(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth))throw Error('Mobile overflow: '+await page.evaluate(()=>Array.from(document.querySelectorAll('body *')).filter(e=>e.getBoundingClientRect().right>innerWidth).map(e=>e.tagName+'.'+e.className).join(', ')));
 if(errors.length)throw Error(errors.join('\n'));console.log('PASS: authentication, diagnostic state, chat, HTML escaping, mobile overflow, no JS errors');await browser.close();server.close();
