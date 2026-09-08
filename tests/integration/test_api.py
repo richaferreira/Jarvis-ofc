@@ -58,3 +58,26 @@ async def test_dashboard_assets_and_status_auth(settings, monkeypatch):
         assert (await client.get('/system/status')).status_code == 401
         status = await client.get('/system/status', headers={'Authorization': f'Bearer {settings.api_token.get_secret_value()}'})
         assert status.json()['status'] == 'missing_model'
+
+
+async def test_stream_endpoint_and_history_require_auth(settings):
+    import json
+    from app.memory.history import HistoryStore
+    class Agent:
+        history = HistoryStore(settings.data_dir)
+        async def chat(self, owner, session, text, **kwargs):
+            await kwargs['emit']({'type': 'token', 'text': 'Olá'})
+            return ChatResponse(text='Olá')
+    async def factory(_):
+        async def close():
+            pass
+        return SimpleNamespace(agent=Agent(), aclose=close)
+    app = create_app(settings, factory)
+    async with app.router.lifespan_context(app):
+        async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+            assert (await client.get('/history')).status_code == 401
+            assert (await client.post('/chat/stream', json={'message':'Oi'})).status_code == 401
+            response = await client.post('/chat/stream', json={'message':'Oi'}, headers={'Authorization': f'Bearer {settings.api_token.get_secret_value()}'})
+            events = [json.loads(line) for line in response.text.splitlines()]
+            assert events[0]['type'] == 'token'
+            assert events[-1]['type'] == 'done'

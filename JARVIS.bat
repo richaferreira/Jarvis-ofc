@@ -118,8 +118,8 @@ if errorlevel 1 goto back
 ".venv\Scripts\python.exe" -m app.main --mode text
 goto process_return
 :api
-echo     Apos iniciar, abra http://127.0.0.1:8000 no navegador.
-echo     Configure API_TOKEN no .env e use a mesma chave no painel.
+echo     O navegador abrira quando o servidor estiver pronto.
+echo     O endereco real sera exibido; portas ocupadas serao evitadas.
 call :need_env
 if errorlevel 1 goto back
 ".venv\Scripts\python.exe" -m app.main --mode api

@@ -10,6 +10,7 @@ function renderCatalog() {
   for (const id of visible) { const row=document.createElement('div'); row.className='tool'; const name=document.createElement('code'); name.textContent=id; row.append(name); $('catalog').append(row); }
 }
 $('model-filter').addEventListener('input', renderCatalog);
+let activeRequest = null, voiceActive = false, recognition = null;
 let zone = 'America/Sao_Paulo';
 function notice(text) { $('notice').textContent = text; }
 function event(text) {
@@ -33,12 +34,17 @@ function bubble(text, role = 'assistant', error = false) {
   item.append(label, document.createTextNode(text)); $('messages').append(item);
   while ($('messages').children.length > 100) $('messages').firstChild.remove();
   $('messages').scrollTop = $('messages').scrollHeight;
+  return item;
 }
 async function status() {
   const current = epoch;
   try {
     const data = await api('/system/status'); if (current !== epoch) return;
-    catalog = data.provider === 'omniroute' ? (data.models || []) : []; renderCatalog();
+    catalog = data.models || []; renderCatalog();
+    const chosen = $('model-select').value; $('model-select').replaceChildren(new Option('Padrão: '+data.model,''));
+    for (const id of catalog) $('model-select').add(new Option(id,id));
+    if (catalog.includes(chosen)) $('model-select').value = chosen;
+    await loadHistory();
     $('model').textContent = data.model; $('provider').textContent = data.provider;
     $('memory-status').textContent = data.memory_enabled ? 'Ativada' : 'Desativada';
     $('prompt').maxLength = data.max_input_chars; zone = data.timezone;
@@ -49,7 +55,7 @@ async function status() {
 }
 $('auth').addEventListener('submit', e => { e.preventDefault(); if (busy) return notice('Aguarde a resposta antes de reconectar.'); epoch++; token = $('token').value.trim(); $('token').value = ''; status(); });
 $('disconnect').addEventListener('click', () => {
-  epoch++; token = ''; catalog = []; renderCatalog(); session = crypto.randomUUID(); turns = 0;
+  stopResponse(); voiceActive = false; recognition?.stop(); epoch++; token = ''; catalog = []; renderCatalog(); session = crypto.randomUUID(); turns = 0;
   $('turns').textContent = '0 respostas'; $('messages').replaceChildren(); $('pending').replaceChildren(); $('events').replaceChildren();
   $('model').textContent = 'Aguardando conexão'; $('provider').textContent = 'Não consultado';
   $('memory-status').textContent = 'Não consultada'; $('core-state').textContent = 'DESCONECTADO';
@@ -61,14 +67,14 @@ $('chat-form').addEventListener('submit', async e => {
   e.preventDefault(); if (busy) return;
   const text = $('prompt').value.trim(); if (!text) return;
   if (!token) return notice('Conecte-se antes de enviar.');
-  const current = epoch; busy = true; $('send').disabled = true; $('clear').disabled = true;
+  const current = epoch; busy = true; $('model-select').disabled = true; $('send').disabled = true; $('clear').disabled = true;
   $('chat-state').textContent = 'Processando o pedido…'; $('prompt').value = '';
   bubble(text, 'user');
   try {
-    const data = await api('/chat', 'POST', {message: text, session_id: session});
+    const data = await streamChat(text, current);
     if (current !== epoch) return;
-    bubble(data.text); turns++; $('turns').textContent = `${turns} respostas`;
-    data.warnings.forEach(event); event('Resposta recebida.');
+    turns++; $('turns').textContent = `${turns} respostas`;
+    data.warnings.forEach(event); event('Resposta recebida.'); await loadHistory();
     if ($('speak').checked && 'speechSynthesis' in window) {
       speechSynthesis.cancel(); const voice = new SpeechSynthesisUtterance(data.text); voice.lang = 'pt-BR'; speechSynthesis.speak(voice);
     }
@@ -83,13 +89,13 @@ $('chat-form').addEventListener('submit', async e => {
         catch (error) { if (current === epoch) event(error.message); }
       }); row.append(button); $('pending').append(row);
     }
-  } catch (error) { if (current === epoch) { bubble(error.message, 'assistant', true); event(error.message); } }
-  finally { busy = false; $('send').disabled = false; $('clear').disabled = false; $('chat-state').textContent = 'Enter envia · Shift + Enter quebra a linha'; }
+  } catch (error) { if (current === epoch) { const message = error.name === 'AbortError' ? 'Resposta interrompida.' : error.message; bubble(message, 'assistant', true); event(message); } }
+  finally { busy = false; activeRequest = null; $('model-select').disabled = false; $('send').disabled = false; $('clear').disabled = false; $('chat-state').textContent = 'Enter envia · Shift + Enter quebra a linha'; }
 });
 $('prompt').addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('chat-form').requestSubmit(); } });
 $('clear').addEventListener('click', async () => {
   if (busy || !confirm('Limpar a conversa atual e revogar ações pendentes?')) return;
-  try { await api(`/sessions/${session}`, 'DELETE'); $('messages').replaceChildren(); $('pending').replaceChildren(); turns = 0; $('turns').textContent = '0 respostas'; event('Conversa limpa. Preferências persistentes mantidas.'); } catch (error) { event(error.message); }
+  try { await api(`/sessions/${session}`, 'DELETE'); $('messages').replaceChildren(); $('pending').replaceChildren(); turns = 0; $('turns').textContent = '0 respostas'; event('Conversa limpa. Preferências persistentes mantidas.'); await loadHistory(); } catch (error) { event(error.message); }
 });
 $('memory-form').addEventListener('submit', async e => {
   e.preventDefault(); const button = e.currentTarget.querySelector('button'); button.disabled = true;
@@ -99,17 +105,84 @@ $('forget').addEventListener('click', async () => {
   if (!confirm('Apagar todas as preferências persistidas? Esta ação não pode ser desfeita.')) return;
   try { await api('/memory', 'DELETE'); event('Preferências apagadas. Limpe também a conversa se quiser remover seu contexto atual.'); } catch (error) { event(error.message); }
 });
+function stopResponse() {
+  activeRequest?.abort();
+  if ('speechSynthesis' in window) speechSynthesis.cancel();
+}
+$('stop').addEventListener('click', () => { voiceActive=false; $('continuous').checked=false; recognition?.stop(); stopResponse(); notice('Interrupção solicitada.'); });
+$('focus').addEventListener('click', () => document.body.classList.toggle('focus-mode'));
+$('new-session').addEventListener('click', () => {
+  if(busy) return notice('Interrompa ou aguarde a resposta atual.');
+  session=crypto.randomUUID(); turns=0; $('turns').textContent='0 respostas'; $('messages').replaceChildren(); $('pending').replaceChildren(); notice('Nova conversa criada.');
+});
+async function loadHistory() {
+  const current=epoch;
+  try {
+    const rows=await api('/history'); if(current!==epoch) return;
+    $('history-list').replaceChildren();
+    for(const row of rows) {
+      const button=document.createElement('button'); button.textContent=row.title || 'Conversa';
+      button.addEventListener('click',async()=>{
+        if(busy) return notice('Interrompa ou aguarde a resposta atual.');
+        try { const transcript=await api('/history/'+encodeURIComponent(row.session)); if(current!==epoch || busy) return;
+          session=row.session; $('messages').replaceChildren(); $('pending').replaceChildren();
+          for(const turn of transcript) {bubble(turn.human,'user');bubble(turn.answer);}
+          turns=transcript.length; $('turns').textContent=turns+' respostas';
+        } catch(error){event(error.message);}
+      }); $('history-list').append(button);
+    }
+  } catch(error) { if(current===epoch) notice(error.message); }
+}
+async function streamChat(text,current) {
+  activeRequest=new AbortController();
+  const response=await fetch('/chat/stream',{method:'POST',headers:{'Authorization':`Bearer ${token}`,'Content-Type':'application/json'},
+    body:JSON.stringify({message:text,session_id:session,model:$('model-select').value || null}),signal:activeRequest.signal});
+  if(!response.ok) {const error=await response.json();throw new Error(typeof error.detail==='string'?error.detail:'Pedido recusado.');}
+  const reader=response.body.getReader(),decoder=new TextDecoder();let pending='',result=null;
+  const item=bubble(''),content=document.createElement('span');item.append(content);
+  try {
+    while(true) {
+      const {value,done}=await reader.read();
+      pending+=decoder.decode(value || new Uint8Array(),{stream:!done});
+      let index;
+      while((index=pending.indexOf('\n'))>=0) {
+        const line=pending.slice(0,index);pending=pending.slice(index+1);if(!line.trim())continue;
+        const message=JSON.parse(line);if(current!==epoch)continue;
+        if(message.type==='reset') content.textContent='';
+        if(message.type==='token') {content.textContent+=message.text;$('messages').scrollTop=$('messages').scrollHeight;}
+        if(message.type==='done') {content.textContent=message.text;result=message;}
+        if(message.type==='error') throw new Error(message.message);
+      }
+      if(pending.length>1000000) throw new Error('Resposta excedeu o limite.');
+      if(done)break;
+    }
+  } finally {await reader.cancel().catch(()=>{});reader.releaseLock();}
+  if(!result)throw new Error('A transmissão foi interrompida antes de concluir.');
+  return result;
+}
 const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 if (Recognition) {
-  const recognition = new Recognition(); recognition.lang = 'pt-BR'; recognition.interimResults = false;
-  recognition.onresult = e => { $('prompt').value = e.results[0][0].transcript; notice('Transcrição pronta. Revise e envie.'); };
-  recognition.onerror = () => notice('Microfone indisponível ou reconhecimento recusado. Confira a permissão do navegador.');
-  recognition.onend = () => { $('mic').disabled = false; $('mic').textContent = '◎ Ditar mensagem'; };
+  recognition = new Recognition(); recognition.lang = 'pt-BR'; recognition.interimResults = false;
+  recognition.onspeechstart = () => { if(voiceActive) stopResponse(); };
+  recognition.onresult = async e => {
+    $('prompt').value = e.results[0][0].transcript;
+    if($('continuous').checked && voiceActive) {
+      for(let i=0;busy && i<40;i++) await new Promise(resolve=>setTimeout(resolve,50));
+      if(!busy && voiceActive) $('chat-form').requestSubmit();
+    } else notice('Transcrição pronta. Revise e envie.');
+  };
+  recognition.onerror = e => { if(e.error!=='no-speech') {voiceActive=false;notice('Reconhecimento interrompido. Confira a permissão do microfone.');} };
+  recognition.onend = () => {
+    $('mic').disabled = false; $('mic').textContent = '◎ Iniciar voz';
+    if(voiceActive && $('continuous').checked) setTimeout(()=>{if(voiceActive)try{recognition.start();}catch{voiceActive=false;}},250);
+    else voiceActive=false;
+  };
   $('mic').addEventListener('click', () => {
-    if (!confirm('Usar reconhecimento de voz do navegador? Dependendo do navegador, o áudio pode ser processado online.')) return;
-    try { if ('speechSynthesis' in window) speechSynthesis.cancel(); recognition.start(); $('mic').disabled = true; $('mic').textContent = 'Ouvindo…'; } catch { notice('Não foi possível iniciar o microfone.'); }
+    if (!token) return notice('Conecte-se antes de iniciar a voz.');
+    if (!confirm('Ativar voz do navegador? O áudio pode ser processado online. Em modo contínuo, as falas serão enviadas automaticamente; use fones para evitar eco.')) return;
+    try { stopResponse(); voiceActive=true; recognition.start(); $('mic').textContent='Ouvindo · use Interromper para parar'; } catch { notice('Não foi possível iniciar o microfone.'); }
   });
-} else { $('mic').disabled = true; $('mic').textContent = 'Ditado não suportado'; }
+} else { $('mic').disabled = true; $('continuous').disabled=true; $('mic').textContent = 'Ditado não suportado'; }
 if (!('speechSynthesis' in window)) $('speak').disabled = true;
 function clock() { const now = new Date(); $('clock').textContent = now.toLocaleTimeString('pt-BR', {timeZone: zone}); $('date').textContent = now.toLocaleDateString('pt-BR', {timeZone: zone, weekday: 'long', day: 'numeric', month: 'long'}); }
 clock(); setInterval(clock, 1000);

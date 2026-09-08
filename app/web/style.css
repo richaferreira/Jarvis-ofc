@@ -3,3 +3,5 @@
 .overview>*,.workspace>*,.right-stack>*{min-width:0}
 
 #catalog{max-height:220px;overflow:auto;margin:12px 0}#catalog code{overflow-wrap:anywhere}#gateway a{color:var(--cyan)}#gateway label{display:block;margin-top:15px;font-size:12px}
+
+select{background:#081b2a;color:var(--text);border:1px solid var(--line);border-radius:7px;padding:10px;max-width:100%}.chat-controls{display:flex;gap:9px;flex-wrap:wrap;align-items:center;margin:12px 0}.chat-controls label{font-size:11px;color:var(--muted)}.chat-controls select{flex:1;min-width:120px}.chat-controls .danger{margin:0}#history-list{max-height:240px;overflow:auto;margin-top:12px}#history-list button{display:block;width:100%;text-align:left;margin:7px 0;overflow-wrap:anywhere}.focus-mode .overview,.focus-mode .right-stack{display:none}.focus-mode .workspace{grid-template-columns:1fr}.focus-mode .chat #messages{height:60vh}@media(max-width:760px){.sidebar-bottom{display:block!important;margin-top:0!important}.sidebar-bottom .wave,.sidebar-bottom p,.sidebar-bottom>small{display:none}.chat-controls button{font-size:11px}}

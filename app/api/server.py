@@ -2,6 +2,7 @@
 
 import asyncio
 import hmac
+import json
 from pathlib import Path
 from collections.abc import Callable
 from contextlib import asynccontextmanager
@@ -9,10 +10,11 @@ from typing import Any
 
 import structlog
 from fastapi import Depends, FastAPI, HTTPException, Request
-from fastapi.responses import JSONResponse, FileResponse
+from fastapi.responses import JSONResponse, FileResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 
 from app.core.provider_diagnostics import inspect_provider
+from app.core.model_factory import ModelFactory
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from starlette.types import ASGIApp, Receive, Scope, Send
 
@@ -110,6 +112,62 @@ def create_app(settings: Settings | None = None,
         if not body.message.strip() or len(body.message) > settings.max_input_chars:
             raise HTTPException(422, "Mensagem vazia ou acima do limite configurado.")
         return await request.app.state.runtime.agent.chat(owner, body.session_id, body.message)
+
+    @app.get("/history")
+    async def history(request: Request, owner: str = Depends(authenticate)) -> list[dict[str, Any]]:
+        return await request.app.state.runtime.agent.history.query('sessions', owner)
+
+    @app.get("/history/{session_id}")
+    async def transcript(session_id: str, request: Request, owner: str = Depends(authenticate)) -> list[dict[str, Any]]:
+        return await request.app.state.runtime.agent.history.query('read', owner, session_id)
+
+    @app.post("/chat/stream")
+    async def stream_chat(body: ChatRequest, request: Request, owner: str = Depends(authenticate)) -> StreamingResponse:
+        if not body.message.strip() or len(body.message) > settings.max_input_chars:
+            raise HTTPException(422, "Mensagem inválida.")
+        selected_settings = None
+        if body.model and body.model != settings.llm_model:
+            catalog = await inspect_provider(settings)
+            if body.model not in catalog.get('models', []):
+                raise HTTPException(422, "Modelo não listado no catálogo autenticado. Atualize o diagnóstico.")
+            selected_settings = settings.model_copy(update={'llm_model': body.model})
+
+        async def events():
+            queue: asyncio.Queue[dict[str, Any]] = asyncio.Queue(maxsize=32)
+
+            async def produce():
+                adapter = None
+                try:
+                    if selected_settings:
+                        adapter = ModelFactory.create(selected_settings)
+                    result = await request.app.state.runtime.agent.chat(owner, body.session_id, body.message,
+                                                                         model=adapter, emit=queue.put)
+                    await queue.put({'type': 'done', **result.model_dump()})
+                except asyncio.CancelledError:
+                    raise
+                except JarvisError as exc:
+                    await queue.put({'type': 'error', 'message': str(exc)})
+                except Exception:
+                    await queue.put({'type': 'error', 'message': 'Falha no processamento da resposta.'})
+                finally:
+                    if adapter is not None:
+                        closer = Runtime(settings)
+                        closer.model = adapter
+                        await asyncio.shield(closer._close_model())
+
+            task = asyncio.create_task(produce())
+            try:
+                while True:
+                    event = await queue.get()
+                    yield json.dumps(event, ensure_ascii=False) + '\n'
+                    if event['type'] in ('done', 'error'):
+                        break
+            finally:
+                task.cancel()
+                await asyncio.gather(task, return_exceptions=True)
+
+        return StreamingResponse(events(), media_type='application/x-ndjson',
+                                 headers={'Cache-Control': 'no-store', 'X-Accel-Buffering': 'no'})
 
     @app.post("/actions/confirm")
     async def confirm(body: ConfirmationRequest, request: Request, owner: str = Depends(authenticate)) -> dict[str, str]:

@@ -159,14 +159,9 @@ def main() -> None:
         settings = Settings()
         configure_logging(settings.log_level)
         if args.mode == "api":
-            if not settings.api_token or len(settings.api_token.get_secret_value()) < 32:
-                raise JarvisError("API_TOKEN ausente ou curto: configure pelo menos 32 caracteres no .env. O servidor não foi iniciado.")
-            import uvicorn
+            from app.api.launcher import run
 
-            from app.api.server import create_app
-
-            uvicorn.run(create_app(settings), host=settings.api_host, port=settings.api_port,
-                        workers=1, access_log=False, limit_concurrency=16)
+            run(settings)
         else:
             asyncio.run(run_console(settings, voice=args.mode == "voice"))
     except KeyboardInterrupt:

@@ -237,7 +237,7 @@ da página; recarregar exige reconectar. O painel não edita arquivos de segredo
 A interface oferece conversa real, preferências persistentes, limpeza de sessão,
 confirmação de ações domésticas e diagnóstico do inventário Ollama. Modelo
 instalado não significa inferência validada. Os indicadores nunca simulam
-CPU, agentes ou conexões inexistentes. As respostas HTTP aparecem completas;
+CPU, agentes ou conexões inexistentes. O endpoint legado /chat retorna respostas completas;
 streaming GraphRAG continua no serviço híbrido separado.
 
 Ditado e leitura em voz alta usam recursos opcionais do navegador, não o
@@ -292,3 +292,41 @@ Se o navegador mostrar conexão recusada, o servidor não está acessível no
 endereço informado. Inicie a opção 5 e aguarde a mensagem do Uvicorn.
 API_TOKEN ausente ou curto agora produz uma explicação direta no terminal.
 Não feche a janela do servidor enquanto usa o painel.
+
+## Melhorias para teste: conversa, voz e inicialização
+
+O painel agora usa `/chat/stream` autenticado, com tokens progressivos reais
+do modelo. A seleção de modelo vale para o pedido, sem alterar o `.env`
+em execução ou compartilhar configuração mutável entre sessões. Apenas
+IDs do catálogo autenticado podem substituir o modelo padrão. Combos e
+credenciais continuam no gateway. Rodadas intermediárias de ferramentas
+podem substituir o texto provisório; a mensagem final é a confirmada.
+
+As conversas concluídas são persistidas em `data/conversations.sqlite3`
+(até 64 sessões por proprietário, 30 pares por sessão). O histórico permite
+reabrir conversas após reiniciar o servidor. Limpar conversa remove seus
+registros e revoga ações pendentes; preferências RAG permanecem separadas.
+O histórico é local e não criptografado. Tokens de ações e credenciais não
+são gravados no histórico. Cancelamento não desfaz uma ação já confirmada.
+
+O seletor fica sobre a conversa, acompanhado de Nova conversa e Interromper.
+Modo foco amplia a área de diálogo. A interface foi ajustada para celular.
+Voz contínua é opcional: após consentimento, o reconhecimento do navegador
+envia a transcrição e a detecção de início de fala interrompe a síntese e
+a requisição ativa. Use fones para evitar reconhecimento do próprio áudio.
+A disponibilidade e qualidade dependem do navegador; isso não substitui o
+Whisper desktop nem fornece VAD neural local. Interromper também desativa
+a escuta contínua. O fechamento do stream cancela a tarefa no servidor.
+
+A opção 5 reserva uma porta livre entre API_PORT e API_PORT+9 antes de
+carregar os modelos, imprime o endereço real e abre o navegador após
+`/health` responder. Um API_TOKEN ausente/curto é gerado e salvo no `.env`.
+Se OmniRoute estiver configurado em localhost mas não estiver escutando,
+o launcher tenta iniciar o comando `omniroute` já instalado no PATH.
+Não instala o gateway nem altera suas credenciais; confira sua janela.
+A configuração de API_TOKEN válida é preservada.
+
+Roteiro: iniciar opção 5; conectar; selecionar modelo; enviar mensagem e
+observar tokens; interromper; abrir nova conversa; reabrir histórico;
+reiniciar e reabrir histórico; testar voz com fones e consentimento; ocupar
+a porta padrão com outro serviço e confirmar o endereço alternativo.

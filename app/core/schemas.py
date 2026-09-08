@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class ChatRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
     session_id: str = Field(default="default", pattern=r"^[A-Za-z0-9_-]{1,64}$")
+    model: str | None = Field(default=None, min_length=1, max_length=256)
     message: str = Field(min_length=1, max_length=16000)
 
 
