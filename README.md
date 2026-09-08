@@ -274,7 +274,7 @@ API_TOKEN=TOKEN_PROPRIO_DO_JARVIS_COM_PELO_MENOS_32_CARACTERES
 `API_TOKEN` autentica o navegador no Jarvis. `OMNIROUTE_API_KEY` autentica
 o Jarvis no gateway; nunca é enviada ao navegador. As chaves dos provedores
 ficam cadastradas no OmniRoute. O painel Jarvis exibe o catálogo autenticado
-e permite filtrá-lo; copie o ID desejado para `LLM_MODEL` e reinicie.
+e permite filtrá-lo e selecionar um modelo por pedido. `LLM_MODEL` permanece como padrão.
 Criar conexões, editar combos e gerenciar credenciais ocorre no painel
 OmniRoute. Não há troca de configuração global durante uma conversa.
 
@@ -306,8 +306,8 @@ As conversas concluídas são persistidas em `data/conversations.sqlite3`
 (até 64 sessões por proprietário, 30 pares por sessão). O histórico permite
 reabrir conversas após reiniciar o servidor. Limpar conversa remove seus
 registros e revoga ações pendentes; preferências RAG permanecem separadas.
-O histórico é local e não criptografado. Tokens de ações e credenciais não
-são gravados no histórico. Cancelamento não desfaz uma ação já confirmada.
+O histórico é local e não criptografado. O histórico armazena apenas o texto enviado e a resposta final, sem os campos
+de tokens das ações ou da configuração. Cancelamento não desfaz uma ação já confirmada.
 
 O seletor fica sobre a conversa, acompanhado de Nova conversa e Interromper.
 Modo foco amplia a área de diálogo. A interface foi ajustada para celular.

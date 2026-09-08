@@ -59,7 +59,7 @@ $('disconnect').addEventListener('click', () => {
   $('turns').textContent = '0 respostas'; $('messages').replaceChildren(); $('pending').replaceChildren(); $('events').replaceChildren();
   $('model').textContent = 'Aguardando conexão'; $('provider').textContent = 'Não consultado';
   $('memory-status').textContent = 'Não consultada'; $('core-state').textContent = 'DESCONECTADO';
-  $('home').textContent = 'Conecte-se para consultar.'; if ('speechSynthesis' in window) speechSynthesis.cancel();
+  $('home').textContent = 'Conecte-se para consultar.'; $('history-list').replaceChildren(); $('model-select').replaceChildren(new Option('Padrão do servidor','')); if ('speechSynthesis' in window) speechSynthesis.cancel();
   event('Desconectado. Uma requisição já enviada pode terminar no servidor.');
 });
 $('refresh').addEventListener('click', status);

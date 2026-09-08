@@ -2,7 +2,7 @@ name: Windows command center
 on:
   push:
     branches: [architecture/hybrid-realtime, main]
-    paths: [JARVIS.bat, scripts/test_windows_panel.py, .github/workflows/windows-panel.yml]
+    paths: [JARVIS.bat, scripts/test_windows_panel.py, scripts/test_windows_launcher.py, app/api/launcher.py, .github/workflows/windows-panel.yml]
   workflow_dispatch:
 permissions:
   contents: read
@@ -16,3 +16,5 @@ jobs:
         with:
           python-version: '3.11'
       - run: python scripts/test_windows_panel.py
+      - run: python -m pip install pydantic-settings python-dotenv tzdata
+      - run: python scripts/test_windows_launcher.py
