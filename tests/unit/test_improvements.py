@@ -68,3 +68,40 @@ def test_launcher_reserves_next_port_without_stopping_existing_process():
         occupied.listen()
         with reserve_port('127.0.0.1', occupied.getsockname()[1]) as reserved:
             assert reserved.getsockname()[1] != occupied.getsockname()[1]
+
+
+async def test_slow_vector_recall_does_not_block_json_or_stream(settings):
+    settings.memory_recall_timeout = 0.1
+    cancelled = asyncio.Event()
+    class SlowMemory:
+        async def recall(self, *_):
+            try:
+                await asyncio.Event().wait()
+            finally:
+                cancelled.set()
+    agent = JarvisAgent(settings, StreamModel(), SlowMemory(), registry())
+    await agent.knowledge.save('owner', 'preference', 'Responda em português')
+    events = []
+    async def emit(event):
+        events.append(event)
+    response = await asyncio.wait_for(agent.chat('owner', 's', 'Oi', emit=emit), 2)
+    assert cancelled.is_set()
+    assert response.text == 'Olá Richardson'
+    assert any('vetorial' in warning for warning in response.warnings)
+    assert [item['type'] for item in events][-1] == 'answer'
+
+
+async def test_final_answer_is_emitted_before_history_write(settings):
+    agent = JarvisAgent(settings, StreamModel(), DisabledMemory(), registry())
+    answer_ready = asyncio.Event()
+    original = agent.history.query
+    async def query(operation, *args):
+        if operation == 'append':
+            assert answer_ready.is_set()
+        return await original(operation, *args)
+    agent.history.query = query
+    async def emit(event):
+        if event['type'] == 'answer':
+            answer_ready.set()
+    await agent.chat('owner', 's', 'Oi', emit=emit)
+    assert answer_ready.is_set()

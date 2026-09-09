@@ -61,6 +61,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     memory_enabled: bool = True
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    memory_recall_timeout: float = Field(default=1.5, ge=0.1, le=30)
     memory_top_k: int = Field(default=3, ge=1, le=10)
     history_turns: int = Field(default=8, ge=1, le=30)
     history_chars: int = Field(default=12000, ge=1000, le=50000)

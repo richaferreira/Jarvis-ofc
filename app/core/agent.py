@@ -141,17 +141,19 @@ class JarvisAgent:
         try:
             async with asyncio.timeout(self.settings.turn_timeout):
                 warnings: list[str] = []
-                try:
-                    async with asyncio.timeout(self.settings.request_timeout):
-                        recalled = await self.memory.recall(owner, text)
-                except Exception as exc:
-                    logger.warning("memory_recall_failed", error_type=type(exc).__name__)
-                    recalled = []
-                    warnings.append("Memória indisponível nesta resposta.")
-                try:
-                    recalled.extend(await self.knowledge.recall(owner, text))
-                except Exception:
-                    warnings.append("Memória JSON indisponível nesta resposta.")
+                async def recall(source: Any, label: str) -> list[str]:
+                    # Retrieval must not hold the first model token for a full network timeout.
+                    try:
+                        async with asyncio.timeout(self.settings.memory_recall_timeout):
+                            return await source.recall(owner, text)
+                    except Exception:
+                        warnings.append(f"{label} indisponível nesta resposta.")
+                        return []
+
+                vector, knowledge = await asyncio.gather(
+                    recall(self.memory, "Memória vetorial"),
+                    recall(self.knowledge, "Memória JSON"))
+                recalled = [*vector, *knowledge]
                 messages: list[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
                 if recalled:
                     # Context is quoted data; retrieval never becomes an executable instruction.
@@ -170,6 +172,8 @@ class JarvisAgent:
                 reply = text_content(state["messages"][-1]).strip()
                 if not reply:
                     reply = "O modelo não retornou texto. Tente reformular o pedido."
+                if emit is not None:
+                    await emit({"type": "answer", "text": reply})
                 try:
                     await self.history.query('append', owner, session, text, reply)
                 except Exception:

@@ -377,3 +377,30 @@ A automação desktop deve rodar no Windows do usuário. Um backend em Docker/Li
 não controla os aplicativos do Windows. Compartilhamento de tela requer navegador
 compatível em localhost ou HTTPS. Os testes automatizados usam respostas simuladas
 para visão/LLM; valide seu modelo e os aplicativos físicos na máquina de destino.
+
+
+## Presença visual e tempo de resposta
+
+O centro do painel tem um avatar vetorial holográfico. Clique em **Conversar por voz**
+para habilitar ditado contínuo e leitura das respostas; confirme o acesso ao áudio.
+Os estados são: pronto, ouvindo, processando, recebendo texto, falando e falha.
+A animação da boca é estilizada, vinculada ao início/fim da voz; não é sincronização
+fonética nem medição do volume do microfone. Use fones para evitar realimentação
+da voz sintetizada. **Interromper** cancela voz e requisição ativa. A voz depende
+do suporte e das vozes PT-BR instaladas/disponíveis no navegador.
+
+As buscas vetorial e JSON agora ocorrem em paralelo, com orçamento individual
+`MEMORY_RECALL_TIMEOUT=1.5` segundos (configurável no `.env`). Em caso de atraso,
+a resposta continua e informa qual memória ficou indisponível naquele turno.
+Os dados persistidos não são apagados. A primeira resposta após início pode precisar
+de aquecimento; aumente esse orçamento se priorizar a recuperação sobre a latência.
+
+Tokens continuam aparecendo progressivamente. A resposta final é enviada para fala
+antes da gravação do histórico; textos intermediários de chamadas de ferramentas
+não são lidos. O painel mostra o tempo real até o primeiro texto desde o envio,
+incluindo rede e gateway. O canvas foi reduzido a 80 pontos e limitado a 30 fps,
+pausando em aba oculta; a preferência do sistema por movimento reduzido é respeitada.
+
+Essas mudanças removem esperas locais, mas não garantem resposta instantânea: o
+modelo/combo escolhido, filas do OmniRoute, aquecimento, ferramentas e conexão
+continuam influenciando o tempo. Não reduzimos REQUEST_TIMEOUT para simular rapidez.
