@@ -86,7 +86,7 @@ def register_desktop(app: FastAPI, settings: Settings, authenticate: Any) -> Non
 
     @app.get('/knowledge')
     async def knowledge_list(owner: str = Depends(authenticate)):
-        return await knowledge.list(owner)
+        return await knowledge.list_entries(owner)
 
     @app.post('/knowledge')
     async def knowledge_save(body: KnowledgeRequest, owner: str = Depends(authenticate)):

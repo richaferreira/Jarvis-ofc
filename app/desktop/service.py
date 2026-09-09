@@ -80,17 +80,17 @@ class DesktopService:
                 path = (repo / name).resolve()
                 if not path.is_relative_to(repo) or path.is_relative_to(repo / '.git'):
                     raise JarvisError('Arquivo fora do repositório ou dentro de .git.')
-                if path.name == '.env' or path.name.startswith('.env.') and path.name != '.env.example':
+                if path.name.lower() == '.env' or path.name.lower().startswith('.env.') and path.name.lower() != '.env.example':
                     raise JarvisError('Arquivos de credenciais .env não podem ser adicionados pelo assistente.')
                 if path.is_dir() or (path.exists() and path.stat().st_size > 5_000_000):
                     raise JarvisError('Selecione arquivos individuais menores que 5 MB.')
                 fingerprints.append(hashlib.sha256(path.read_bytes()).hexdigest() if path.exists() else 'deleted')
-            detail = await self.command(repo, 'diff', '--stat', '--', *paths)
+            detail = await self.command(repo, '--literal-pathspecs', 'diff', '--stat', '--', *paths)
             return {'action': action, 'alias': alias, 'paths': paths, 'fingerprints': fingerprints,
                     'description': 'git add: ' + ', '.join(paths), 'detail': detail,
                     'repo': str(repo)}
         staged_names = (await self.command(repo, 'diff', '--cached', '--name-only', '-z')).split('\0')
-        if any(Path(name).name == '.env' or (Path(name).name.startswith('.env.') and Path(name).name != '.env.example') for name in staged_names):
+        if any(Path(name).name.lower() == '.env' or (Path(name).name.lower().startswith('.env.') and Path(name).name.lower() != '.env.example') for name in staged_names):
             raise JarvisError('Há um arquivo .env no stage. Remova-o do stage antes de confirmar pelo assistente.')
         staged = await self.command(repo, 'diff', '--cached', '--stat')
         if not staged.strip() or not message.strip():

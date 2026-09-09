@@ -20,14 +20,14 @@ async def test_json_memory_is_atomic_persistent_and_owner_scoped(tmp_path):
     first, second = KnowledgeStore(tmp_path), KnowledgeStore(tmp_path)
     await asyncio.gather(first.save('owner','code_tip','Use asyncio para I/O.'),
                          second.save('owner','resolved_error','NameError: defina a variável.'))
-    assert len(await first.list('owner')) == 2
-    assert await first.list('other') == []
+    assert len(await first.list_entries('owner')) == 2
+    assert await first.list_entries('other') == []
     assert len(json.loads((tmp_path/'knowledge.json').read_text())) == 2
-    entries = await second.list('owner')
+    entries = await second.list_entries('owner')
     await first.delete('other', entries[0]['id'])
-    assert len(await first.list('owner')) == 2
+    assert len(await first.list_entries('owner')) == 2
     await first.delete('owner', entries[0]['id'])
-    assert len(await first.list('owner')) == 1
+    assert len(await first.list_entries('owner')) == 1
     (tmp_path/'knowledge.json').write_text('broken json')
     with pytest.raises(JarvisError):
         await first.save('owner','preference','Do not overwrite corrupt JSON')

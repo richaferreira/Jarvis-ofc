@@ -40,7 +40,7 @@ class KnowledgeStore:
             if os.path.exists(temporary):
                 os.unlink(temporary)
 
-    async def list(self, owner: str) -> list[dict[str, str]]:
+    async def list_entries(self, owner: str) -> list[dict[str, str]]:
         async with self.lock:
             return [x for x in await asyncio.to_thread(self._read) if x.get('owner') == owner]
 
@@ -60,7 +60,7 @@ class KnowledgeStore:
 
     async def recall(self, owner: str, query: str) -> list[str]:
         words = {w.lower() for w in query.split() if len(w) > 2}
-        entries = await self.list(owner)
+        entries = await self.list_entries(owner)
         ranked = sorted(entries, key=lambda x: sum(w in x.get('text', '').lower() for w in words)
                         + (1 if x.get('category') == 'preference' else 0), reverse=True)
         return [x['text'][:2000] for x in ranked[:4] if x.get('text')]
