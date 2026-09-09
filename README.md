@@ -88,7 +88,7 @@ Para testar somente o núcleo sem baixar pesos:
 .\.venv\Scripts\python.exe -m pip install -r requirements-core.txt
 ```
 
-Configure `MEMORY_ENABLED=false` e use `--mode text` ou `--mode api`. Ainda é necessário um LLM acessível. Essa opção desativa explicitamente a memória de longo prazo.
+Configure `MEMORY_ENABLED=false` e use `--mode text` ou `--mode api`. Ainda é necessário um LLM acessível. Essa opção desativa a memória vetorial ChromaDB. A memória JSON do painel e o histórico SQLite continuam disponíveis.
 
 ## Voz
 
@@ -139,7 +139,9 @@ Invoke-RestMethod -Uri http://127.0.0.1:8000/chat -Method Post -Headers $jarvisH
 | `DELETE /memory` | Apaga preferências do proprietário; chamada autenticada já constitui autorização. |
 | `DELETE /sessions/desktop` | Limpa histórico dessa sessão e propostas pendentes. |
 
-Todos, exceto `/health`, exigem Bearer token. A API representa **um proprietário**; `session_id` separa conversas, não é um sistema multiusuário. O token dá acesso a confirmações e memória: não o distribua a terceiros. Não há upload HTTP de áudio nesta versão; o áudio é capturado no terminal local. Para publicar na rede, configure TLS, autenticação por usuário e limites de tráfego em um gateway; não exponha o servidor de desenvolvimento diretamente.
+Os endpoints de dados acima exigem Bearer token; `/health` é público.
+O painel e seus assets são públicos, mas não contêm dados pessoais. As rotas
+`/session/refresh` e `/session/logout` usam o cookie de sessão e validam a origem. A API representa **um proprietário**; `session_id` separa conversas, não é um sistema multiusuário. O token dá acesso a confirmações e memória: não o distribua a terceiros. Não há upload HTTP de áudio nesta versão; o áudio é capturado no terminal local. Para publicar na rede, configure TLS, autenticação por usuário e limites de tráfego em um gateway; não exponha o servidor de desenvolvimento diretamente.
 
 ## Testes e dependências reproduzíveis
 
@@ -231,8 +233,9 @@ iniciado de outra pasta, pois usa a localizacao do proprio arquivo.
 A opção 5 do `JARVIS.bat` inicia a API com o painel visual. Configure
 `API_TOKEN` no `.env` (pelo menos 32 caracteres aleatórios), abra
 `http://127.0.0.1:8000` e conecte-se com esse token. Se alterar API_HOST ou
-API_PORT, use o endereço correspondente. O token permanece apenas na memória
-da página; recarregar exige reconectar. O painel não edita arquivos de segredos.
+API_PORT, use o endereço exibido pelo inicializador. Com “Lembrar neste navegador”,
+a sessão é restaurada por até 30 dias; sem essa opção, recarregar exige reconectar.
+O painel não edita arquivos de segredos.
 
 A interface oferece conversa real, preferências persistentes, limpeza de sessão,
 confirmação de ações domésticas e diagnóstico do inventário Ollama. Modelo
@@ -365,6 +368,7 @@ Atualize a branch `architecture/hybrid-realtime`, instale `requirements.txt` nov
   O commit inclui o stage revisado, usa a identidade e os hooks locais do Git e não
   faz push. Configure `git config user.name` e `git config user.email` previamente.
 - **OmniRoute no mesmo navegador:** consulte e selecione modelos no próprio Jarvis.
+  O inicializador usa `omniroute serve --no-open` para evitar uma segunda aba.
   A administração do gateway abre na mesma aba; use Voltar para retornar ao Jarvis.
   A sessão lembrada reconecta automaticamente. A administração completa não é
   embutida em iframe, pois o gateway bloqueia esse uso. Captura e voz param ao sair.
