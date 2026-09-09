@@ -51,9 +51,9 @@ def prepare(settings: Settings) -> None:
     if shutil.which('omniroute'):
         if os.name == 'nt':
             # Fixed command only: never interpolate model names, URLs or secrets into cmd.
-            subprocess.Popen('omniroute', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
+            subprocess.Popen('omniroute serve --no-open', shell=True, creationflags=subprocess.CREATE_NEW_CONSOLE)
         else:
-            subprocess.Popen([shutil.which('omniroute') or 'omniroute'], start_new_session=True)
+            subprocess.Popen([shutil.which('omniroute') or 'omniroute', 'serve', '--no-open'], start_new_session=True)
         print('Inicialização do OmniRoute solicitada. Confira a janela do gateway.')
     else:
         print('OmniRoute não encontrado no PATH. Inicie o gateway antes de conversar.')

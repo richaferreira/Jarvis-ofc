@@ -5,6 +5,7 @@ from contextlib import AsyncExitStack
 from typing import Any
 
 from app.config import Settings
+from app.desktop.service import DesktopService
 from app.core.agent import JarvisAgent
 from app.core.model_factory import ModelFactory
 from app.infrastructure.http_client import HttpClient
@@ -36,7 +37,8 @@ class Runtime:
             if isinstance(self.memory, MemoryService):
                 await self.memory.initialize()
             self.home = HomeAssistantService(settings, self.http)
-            registry = ToolRegistry(settings, self.search, WeatherService(self.http), self.home)
+            self.desktop = DesktopService(settings.data_dir)
+            registry = ToolRegistry(settings, self.search, WeatherService(self.http), self.home, self.desktop)
             self.model = ModelFactory.create(settings)
             self._stack.push_async_callback(self._close_model)
             self.agent = JarvisAgent(settings, self.model, self.memory, registry)
@@ -74,6 +76,11 @@ class Runtime:
         provider: Any = EdgeProvider(self.settings.edge_voice) if self.settings.tts_provider == "edge" else ElevenLabsProvider(self.settings, self.http)
         self.tts = SpeechSynthesizer(self.settings, cache, provider)
         await self.stt.initialize()
+
+    async def confirm(self, token: str, owner: str, session: str) -> dict[str, str]:
+        if token.startswith('desktop_'):
+            return await self.desktop.confirm(owner, session, token)
+        return await self.home.confirm(token, owner, session)
 
     async def aclose(self) -> None:
         """Close resources in reverse initialization order."""

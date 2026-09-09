@@ -330,3 +330,46 @@ Roteiro: iniciar opção 5; conectar; selecionar modelo; enviar mensagem e
 observar tokens; interromper; abrir nova conversa; reabrir histórico;
 reiniciar e reabrir histórico; testar voz com fones e consentimento; ocupar
 a porta padrão com outro serviço e confirmar o endereço alternativo.
+
+## Visão, debugger, memória JSON e automação desktop
+
+Atualize a branch `architecture/hybrid-realtime`, instale `requirements.txt` novamente
+(Pillow e psutil são novos) e execute `JARVIS.bat`, opção 5.
+
+- **Lembrar neste navegador:** conecte uma vez com API_TOKEN e marque a opção.
+  Uma sessão revogável dura 30 dias e sobrevive ao reinício. A chave do OmniRoute
+  continua somente no `.env`; ela não é gravada no navegador. Desconectar revoga
+  a sessão. Trocar API_TOKEN invalida todas as sessões anteriores.
+- **Visão e debugger:** escolha um modelo que aceite imagens, clique em compartilhar
+  tela e selecione a janela no navegador. Analise uma captura ou ative a repetição
+  opcional (15 segundos após cada resposta). Cada captura é enviada ao provedor
+  selecionado; a aplicação não salva screenshots. Pare o compartilhamento ao terminar.
+  A latência depende do gateway/modelo. Para erros, também pode colar o traceback
+  sem compartilhar tela. A análise sugere correções; não executa código.
+- **Memória JSON:** salve preferências, dicas e erros resolvidos no painel.
+  O arquivo `data/knowledge.json` usa substituição atômica e limite de 500 registros.
+  O agente recupera até quatro notas relevantes por turno. Essa memória complementa
+  ChromaDB e o histórico SQLite; não substitui esses armazenamentos. Arquivos JSON
+  corrompidos são preservados para recuperação, em vez de sobrescritos.
+- **Gamer e produtividade:** abra a configuração de aplicativos, detecte instalações,
+  revise os caminhos e salve. A detecção procura Steam, Discord e Opera GX em caminhos
+  comuns; instalações diferentes podem ser cadastradas no JSON do painel.
+  O arquivo persistido é `data/desktop.json`, com `apps`, `profiles` e `repos`.
+  Peça no chat: “abra o perfil gamer” ou “feche o perfil produtividade”. Revise a
+  proposta e confirme. Fechar solicita WM_CLOSE: aplicativos podem pedir para salvar
+  ou permanecer na bandeja. O assistente não força o encerramento.
+- **Git:** cadastre a raiz do repositório em `repos`. Use o painel ou peça ao chat
+  para adicionar arquivos específicos ao stage; depois solicite um commit com mensagem.
+  A revisão expira em 120 segundos, é de uso único e rejeita arquivos alterados desde
+  a proposta. Arquivos `.env`, caminhos externos e diretórios inteiros são recusados.
+  O commit inclui o stage revisado, usa a identidade e os hooks locais do Git e não
+  faz push. Configure `git config user.name` e `git config user.email` previamente.
+- **OmniRoute no mesmo navegador:** consulte e selecione modelos no próprio Jarvis.
+  A administração do gateway abre na mesma aba; use Voltar para retornar ao Jarvis.
+  A sessão lembrada reconecta automaticamente. A administração completa não é
+  embutida em iframe, pois o gateway bloqueia esse uso. Captura e voz param ao sair.
+
+A automação desktop deve rodar no Windows do usuário. Um backend em Docker/Linux
+não controla os aplicativos do Windows. Compartilhamento de tela requer navegador
+compatível em localhost ou HTTPS. Os testes automatizados usam respostas simuladas
+para visão/LLM; valide seu modelo e os aplicativos físicos na máquina de destino.

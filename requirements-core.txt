@@ -16,3 +16,7 @@ edge-tts>=7.2,<8.0
 ddgs>=9.0,<10.0
 structlog>=25.0,<26.0
 tzdata>=2025.1
+
+# Desktop screenshot validation and graceful Windows profile closing.
+Pillow>=10.4,<13
+psutil>=6,<8

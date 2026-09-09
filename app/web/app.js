@@ -22,7 +22,7 @@ function event(text) {
 }
 async function api(path, method = 'GET', body) {
   if (!token) throw new Error('Conecte-se usando o API_TOKEN do seu .env.');
-  const response = await fetch(path, {method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json'}, body: body === undefined ? undefined : JSON.stringify(body)});
+  const response = await fetch(path, {method, headers: {'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json', 'X-Jarvis-Request': '1'}, body: body === undefined ? undefined : JSON.stringify(body)});
   const data = await response.json();
   if (!response.ok) throw new Error(typeof data.detail === 'string' ? data.detail : 'Requisição recusada. Confira os campos e o token.');
   return data;
@@ -53,8 +53,17 @@ async function status() {
     event(data.message);
   } catch (error) { if (current === epoch) { $('core-state').textContent = 'CONEXÃO NÃO VALIDADA'; event(error.message); } }
 }
-$('auth').addEventListener('submit', e => { e.preventDefault(); if (busy) return notice('Aguarde a resposta antes de reconectar.'); epoch++; token = $('token').value.trim(); $('token').value = ''; status(); });
+$('auth').addEventListener('submit', async e => {
+  e.preventDefault(); if (busy) return notice('Aguarde a resposta antes de reconectar.');
+  epoch++; token=$('token').value.trim(); $('token').value='';
+  try {
+    if($('remember-login').checked) {const data=await api('/session/login','POST');token=data.access_token;}
+    else await fetch('/session/logout',{method:'POST',headers:{'X-Jarvis-Request':'1'}});
+    await status(); document.dispatchEvent(new Event('jarvis-connected'));
+  } catch(error){token='';event(error.message);}
+});
 $('disconnect').addEventListener('click', () => {
+  fetch('/session/logout',{method:'POST',headers:{'X-Jarvis-Request':'1'}}).catch(()=>{}); document.dispatchEvent(new Event('jarvis-disconnected'));
   stopResponse(); voiceActive = false; recognition?.stop(); epoch++; token = ''; catalog = []; renderCatalog(); session = crypto.randomUUID(); turns = 0;
   $('turns').textContent = '0 respostas'; $('messages').replaceChildren(); $('pending').replaceChildren(); $('events').replaceChildren();
   $('model').textContent = 'Aguardando conexão'; $('provider').textContent = 'Não consultado';
@@ -81,7 +90,7 @@ $('chat-form').addEventListener('submit', async e => {
     $('pending').replaceChildren();
     for (const action of data.pending_actions) {
       const row = document.createElement('p'), button = document.createElement('button');
-      row.append(document.createTextNode(`Confirmação necessária: ${action.description}`)); button.textContent = 'Confirmar execução';
+      row.append(document.createTextNode(`Confirmação necessária: ${action.description}\n${action.detail || ''}`)); button.textContent = 'Confirmar execução';
       button.addEventListener('click', async () => {
         if (current !== epoch || !confirm(`Executar: ${action.description}?`)) return;
         button.disabled = true;
@@ -201,3 +210,12 @@ function draw(ms) {
   if(!reduced) requestAnimationFrame(draw);
 }
 if(ctx) draw(0);
+
+(async()=>{
+  try {
+    const response=await fetch('/session/refresh',{method:'POST',headers:{'X-Jarvis-Request':'1'}});
+    if(!response.ok)return;
+    const data=await response.json();token=data.access_token;await status();
+    document.dispatchEvent(new Event('jarvis-connected'));
+  } catch { /* First connection remains available even without a stored session. */ }
+})();

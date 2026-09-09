@@ -7,6 +7,7 @@ from typing import Annotated, Any, TypedDict
 from collections.abc import Awaitable, Callable
 from langchain_core.messages import AIMessageChunk, message_chunk_to_message
 from app.memory.history import HistoryStore
+from app.memory.knowledge import KnowledgeStore
 
 import structlog
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage, SystemMessage, ToolMessage
@@ -51,6 +52,7 @@ class JarvisAgent:
                                          settings.history_chars, settings.session_ttl)
         self._gate = asyncio.Semaphore(1)
         self.history = HistoryStore(settings.data_dir)
+        self.knowledge = KnowledgeStore(settings.data_dir)
 
     def _graph(self, owner: str, session: str, model: Any = None, emit: Callable[[dict[str, Any]], Awaitable[None]] | None = None) -> Any:
         tools = {tool.name: tool for tool in self.registry.build(owner, session)}
@@ -146,6 +148,10 @@ class JarvisAgent:
                     logger.warning("memory_recall_failed", error_type=type(exc).__name__)
                     recalled = []
                     warnings.append("Memória indisponível nesta resposta.")
+                try:
+                    recalled.extend(await self.knowledge.recall(owner, text))
+                except Exception:
+                    warnings.append("Memória JSON indisponível nesta resposta.")
                 messages: list[BaseMessage] = [SystemMessage(content=SYSTEM_PROMPT)]
                 if recalled:
                     # Context is quoted data; retrieval never becomes an executable instruction.
@@ -173,6 +179,8 @@ class JarvisAgent:
                 return ChatResponse(text=reply, pending_actions=pending, warnings=warnings)
         except asyncio.CancelledError:
             await self.registry.home.clear_session(owner, session)
+            if getattr(self.registry, "desktop", None):
+                await self.registry.desktop.clear_session(owner, session)
             raise
         except JarvisError:
             raise
@@ -188,3 +196,5 @@ class JarvisAgent:
             await self.history.query("clear", owner, session)
             self.buffer.clear(owner, session)
             await self.registry.home.clear_session(owner, session)
+            if getattr(self.registry, "desktop", None):
+                await self.registry.desktop.clear_session(owner, session)

@@ -23,6 +23,8 @@ from app.core.schemas import ChatRequest, ChatResponse, ConfirmationRequest, Pre
 from app.exceptions import ActionError, BusyError, JarvisError
 from app.logging_config import configure_logging
 from app.runtime import Runtime
+from app.api.browser_session import BrowserSessions
+from app.api.desktop_routes import register_desktop
 
 logger = structlog.get_logger()
 
@@ -45,7 +47,8 @@ class BodyLimitMiddleware:
                     if message["type"] == "http.disconnect":
                         return
                     body.extend(message.get("body", b""))
-                    if len(body) > self.limit:
+                    limit = 1_500_000 if scope.get('path') == '/vision' else self.limit
+                    if len(body) > limit:
                         await JSONResponse({"detail": "Corpo da requisição excedeu o limite."}, 413)(scope, receive, send)
                         return
                     if not message.get("more_body", False):
@@ -87,9 +90,10 @@ def create_app(settings: Settings | None = None,
                   docs_url=None, redoc_url=None, openapi_url=None)
     app.add_middleware(BodyLimitMiddleware)
     bearer = HTTPBearer(auto_error=False)
+    browser_sessions = BrowserSessions(settings.data_dir, token)
 
     async def authenticate(credentials: HTTPAuthorizationCredentials | None = Depends(bearer)) -> str:
-        if credentials is None or not hmac.compare_digest(credentials.credentials.encode(), token.encode()):
+        if credentials is None or not (hmac.compare_digest(credentials.credentials.encode(), token.encode()) or await browser_sessions.valid(credentials.credentials)):
             raise HTTPException(401, "Credenciais inválidas.", headers={"WWW-Authenticate": "Bearer"})
         return "owner"  # One configured principal. Clients cannot select another user's identity.
 
@@ -172,7 +176,10 @@ def create_app(settings: Settings | None = None,
     @app.post("/actions/confirm")
     async def confirm(body: ConfirmationRequest, request: Request, owner: str = Depends(authenticate)) -> dict[str, str]:
         async with asyncio.timeout(settings.request_timeout):
-            return await request.app.state.runtime.home.confirm(body.token, owner, body.session_id)
+            runtime = request.app.state.runtime
+            if body.token.startswith('desktop_'):
+                return await runtime.desktop.confirm(owner, body.session_id, body.token)
+            return await runtime.home.confirm(body.token, owner, body.session_id)
 
     @app.post("/memory")
     async def remember(body: PreferenceRequest, request: Request, owner: str = Depends(authenticate)) -> dict[str, str]:
@@ -208,4 +215,35 @@ def create_app(settings: Settings | None = None,
     async def system_status(owner: str = Depends(authenticate)) -> dict[str, object]:
         return await inspect_provider(settings)
 
+    def check_browser(request: Request) -> None:
+        origin = request.headers.get('origin')
+        if request.headers.get('x-jarvis-request') != '1' or (origin and origin != str(request.base_url).rstrip('/')):
+            raise HTTPException(403, 'Solicitação de sessão não permitida.')
+
+    @app.post('/session/login')
+    async def login(request: Request, owner: str = Depends(authenticate)):
+        check_browser(request)
+        access = await browser_sessions.create()
+        response = JSONResponse({'access_token': access}, headers={'Cache-Control': 'no-store'})
+        response.set_cookie('jarvis_session', access, httponly=True, secure=request.url.scheme == 'https',
+                            samesite='strict', max_age=30*86400, path='/session')
+        return response
+
+    @app.post('/session/refresh')
+    async def refresh_session(request: Request):
+        check_browser(request)
+        access = request.cookies.get('jarvis_session', '')
+        if not await browser_sessions.valid(access):
+            raise HTTPException(401, 'Entre novamente com seu API_TOKEN.')
+        return JSONResponse({'access_token': access}, headers={'Cache-Control': 'no-store'})
+
+    @app.post('/session/logout')
+    async def logout(request: Request):
+        check_browser(request)
+        await browser_sessions.revoke(request.cookies.get('jarvis_session', ''))
+        response = JSONResponse({'status': 'disconnected'})
+        response.delete_cookie('jarvis_session', path='/session')
+        return response
+
+    register_desktop(app, settings, authenticate)
     return app

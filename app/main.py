@@ -58,7 +58,7 @@ async def handle_command(runtime: Runtime, text: str, session: str) -> bool:
         await runtime.agent.clear("owner", session)
         print("Conversa limpa; ações pendentes revogadas.")
     elif command == "/confirm":
-        result = await runtime.home.confirm(argument.strip(), "owner", session)
+        result = await runtime.confirm(argument.strip(), "owner", session)
         print(result["message"])
     elif command == "/help":
         print("/remember TEXTO | /forget | /clear | /confirm TOKEN | /exit")
@@ -117,7 +117,7 @@ async def run_console(settings: Settings, voice: bool) -> None:
                         if answer == "/exit":
                             return
                         if answer == "CONFIRMAR":
-                            result = await runtime.home.confirm(pending["token"], "owner", session)
+                            result = await runtime.confirm(pending["token"], "owner", session)
                             print(result["message"])
             except (JarvisError, ValueError, TimeoutError) as exc:
                 print(terminal_text(str(exc)) or "Tempo de operação excedido.", file=sys.stderr)
