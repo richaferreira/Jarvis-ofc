@@ -44,11 +44,13 @@ class Settings(BaseSettings):
     """Runtime settings loaded by python-dotenv through pydantic-settings."""
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
-    llm_provider: Literal["openai", "gemini", "ollama"] = "ollama"
+    llm_provider: Literal["openai", "gemini", "ollama", "omniroute"] = "ollama"
     llm_model: str = "qwen3:8b"
     openai_api_key: SecretStr | None = None
     google_api_key: SecretStr | None = None
     ollama_base_url: str = "http://127.0.0.1:11434"
+    omniroute_base_url: str = "http://127.0.0.1:20128/v1"
+    omniroute_api_key: SecretStr | None = None
     llm_max_tokens: int = Field(default=1024, ge=64, le=8192)
     request_timeout: float = Field(default=30, ge=1, le=120)
     turn_timeout: float = Field(default=120, ge=5, le=600)
@@ -59,6 +61,7 @@ class Settings(BaseSettings):
     data_dir: Path = Path("data")
     memory_enabled: bool = True
     embedding_model: str = "sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2"
+    memory_recall_timeout: float = Field(default=1.5, ge=0.1, le=30)
     memory_top_k: int = Field(default=3, ge=1, le=10)
     history_turns: int = Field(default=8, ge=1, le=30)
     history_chars: int = Field(default=12000, ge=1000, le=50000)
@@ -100,7 +103,7 @@ class Settings(BaseSettings):
             raise ValueError("Fuso horário desconhecido.") from exc
         return value
 
-    @field_validator("ollama_base_url", "home_assistant_url")
+    @field_validator("ollama_base_url", "home_assistant_url", "omniroute_base_url")
     @classmethod
     def valid_url(cls, value: str | None) -> str | None:
         """Reject credentials, query strings, fragments and non-HTTP transports."""

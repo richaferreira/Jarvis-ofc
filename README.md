@@ -88,7 +88,7 @@ Para testar somente o núcleo sem baixar pesos:
 .\.venv\Scripts\python.exe -m pip install -r requirements-core.txt
 ```
 
-Configure `MEMORY_ENABLED=false` e use `--mode text` ou `--mode api`. Ainda é necessário um LLM acessível. Essa opção desativa explicitamente a memória de longo prazo.
+Configure `MEMORY_ENABLED=false` e use `--mode text` ou `--mode api`. Ainda é necessário um LLM acessível. Essa opção desativa a memória vetorial ChromaDB. A memória JSON do painel e o histórico SQLite continuam disponíveis.
 
 ## Voz
 
@@ -139,7 +139,9 @@ Invoke-RestMethod -Uri http://127.0.0.1:8000/chat -Method Post -Headers $jarvisH
 | `DELETE /memory` | Apaga preferências do proprietário; chamada autenticada já constitui autorização. |
 | `DELETE /sessions/desktop` | Limpa histórico dessa sessão e propostas pendentes. |
 
-Todos, exceto `/health`, exigem Bearer token. A API representa **um proprietário**; `session_id` separa conversas, não é um sistema multiusuário. O token dá acesso a confirmações e memória: não o distribua a terceiros. Não há upload HTTP de áudio nesta versão; o áudio é capturado no terminal local. Para publicar na rede, configure TLS, autenticação por usuário e limites de tráfego em um gateway; não exponha o servidor de desenvolvimento diretamente.
+Os endpoints de dados acima exigem Bearer token; `/health` é público.
+O painel e seus assets são públicos, mas não contêm dados pessoais. As rotas
+`/session/refresh` e `/session/logout` usam o cookie de sessão e validam a origem. A API representa **um proprietário**; `session_id` separa conversas, não é um sistema multiusuário. O token dá acesso a confirmações e memória: não o distribua a terceiros. Não há upload HTTP de áudio nesta versão; o áudio é capturado no terminal local. Para publicar na rede, configure TLS, autenticação por usuário e limites de tráfego em um gateway; não exponha o servidor de desenvolvimento diretamente.
 
 ## Testes e dependências reproduzíveis
 
@@ -181,3 +183,224 @@ Os testes exercitam o grafo LangGraph real com modelo falso determinístico, con
 - [DDGS](https://pypi.org/project/ddgs/) — cliente de terceiros, sujeito a bloqueios e limites; não é uma API oficial DuckDuckGo com SLA.
 - [Open-Meteo](https://open-meteo.com/en/docs) — observe atribuição, limites e condições aplicáveis ao seu uso, especialmente comercial.
 - [Home Assistant REST](https://developers.home-assistant.io/docs/api/rest/)
+
+## Inicialização do núcleo híbrido
+
+Na branch `architecture/hybrid-realtime`, o checkout completo oferece um novo modo:
+
+```bash
+python -m pip install uv==0.10.0
+python -m app.main --mode hybrid --hybrid-host 127.0.0.1 --hybrid-port 8000
+```
+
+Prepare antes `examples/hybrid/.env` e os serviços conforme o
+[guia híbrido](examples/hybrid/README.md). O comando usa o `uv.lock` desse
+subprojeto e lê seu `.env`; não precisa instalar Whisper ou as dependências
+da aplicação desktop. Para executar o agente fora do Docker, configure nesse
+`.env` os endereços alcançáveis do ChromaDB, Neo4j, MQTT e Ollama. Os nomes
+`chroma`, `neo4j` e `mqtt` da rede Compose não são resolvidos pelo host.
+O Compose completo continua sendo a opção pronta para a rede interna.
+
+O processo mantém o código de saída do serviço e encerra com Ctrl+C.
+O padrão escuta apenas localhost, com um worker. Este modo integra a
+inicialização: o WebSocket híbrido ainda não compartilha a memória buffer,
+as ferramentas de ação ou o pipeline de voz da aplicação desktop.
+A instalação por wheel sem `examples/hybrid` não oferece esse modo.
+
+## Central de comando Windows
+
+Abra `JARVIS.bat` na raiz do checkout completo. O painel ciano sobre fundo
+preto oferece instalacao automatizada da `.venv`, configuracao, modos voz,
+texto e API, dispositivos de audio, gerenciamento do Compose hibrido e
+diagnostico sem exibir segredos. A instalacao cria `.env` apenas quando
+ausente; preencha o provedor e as credenciais antes de iniciar o assistente.
+
+Use Python 3.11 ou 3.12. Voz requer FFmpeg/ffplay no PATH e microfone.
+O hibrido requer Docker Desktop com conteineres Linux, configuracao de
+segredos e usuarios do broker conforme `examples/hybrid/README.md`.
+O painel nao instala ferramentas do sistema nem baixa modelos Ollama.
+A opcao P para os conteineres preservando os volumes. Fechar o painel
+nao encerra servicos Docker. Ctrl+C durante o assistente pode pedir a
+confirmacao padrao do Windows para encerrar o arquivo em lotes.
+
+`JARVIS.bat --help` mostra a ajuda; `JARVIS.bat --check` executa somente
+o diagnostico. Seu codigo zero indica que o diagnostico executou, nao
+que todos os requisitos estao instalados. O painel tambem funciona quando
+iniciado de outra pasta, pois usa a localizacao do proprio arquivo.
+
+## Interface visual em português
+
+A opção 5 do `JARVIS.bat` inicia a API com o painel visual. Configure
+`API_TOKEN` no `.env` (pelo menos 32 caracteres aleatórios), abra
+`http://127.0.0.1:8000` e conecte-se com esse token. Se alterar API_HOST ou
+API_PORT, use o endereço exibido pelo inicializador. Com “Lembrar neste navegador”,
+a sessão é restaurada por até 30 dias; sem essa opção, recarregar exige reconectar.
+O painel não edita arquivos de segredos.
+
+A interface oferece conversa real, preferências persistentes, limpeza de sessão,
+confirmação de ações domésticas e diagnóstico do inventário Ollama. Modelo
+instalado não significa inferência validada. Os indicadores nunca simulam
+CPU, agentes ou conexões inexistentes. O endpoint legado /chat retorna respostas completas;
+streaming GraphRAG continua no serviço híbrido separado.
+
+Ditado e leitura em voz alta usam recursos opcionais do navegador, não o
+Whisper/Edge-TTS do desktop. O ditado pode usar processamento online e pede
+consentimento antes de ativar. A interface é responsiva e respeita a preferência
+de movimento reduzido. Não é uma implementação de áudio full-duplex.
+
+Se houver ResponseError, teste `ollama list` e `ollama run qwen3:8b`. O painel
+consulta `/api/tags` pelo servidor e diferencia modelo ausente de serviço
+inacessível; chamadas ao modelo apresentam mensagens próprias para 400, 404,
+5xx e timeout, sem revelar prompts ou credenciais do provedor. O aviso de
+HF_TOKEN no primeiro download de embeddings não implica falha do Ollama.
+
+## OmniRoute: múltiplos provedores pelo mesmo gateway
+
+Integração com https://github.com/diegosouzapw/OmniRoute pelo protocolo
+OpenAI Chat Completions. Instale o gateway seguindo as instruções oficiais
+(`npm install -g omniroute`, com Node compatível), execute `omniroute` em
+outro terminal e abra http://127.0.0.1:20128. Conecte seus provedores e
+configure um modelo ou combo com suporte a ferramentas. Gere uma chave em
+Endpoints no painel do gateway. Os custos, cotas, permissões e disponibilidade
+continuam sendo os de cada provedor.
+
+No `.env` da raiz, edite as linhas existentes (não duplique):
+
+```dotenv
+LLM_PROVIDER=omniroute
+LLM_MODEL=ID_EXATO_DO_MODELO_OU_COMBO
+OMNIROUTE_BASE_URL=http://127.0.0.1:20128/v1
+OMNIROUTE_API_KEY=CHAVE_GERADA_NO_GATEWAY
+API_TOKEN=TOKEN_PROPRIO_DO_JARVIS_COM_PELO_MENOS_32_CARACTERES
+```
+
+`API_TOKEN` autentica o navegador no Jarvis. `OMNIROUTE_API_KEY` autentica
+o Jarvis no gateway; nunca é enviada ao navegador. As chaves dos provedores
+ficam cadastradas no OmniRoute. O painel Jarvis exibe o catálogo autenticado
+e permite filtrá-lo e selecionar um modelo por pedido. `LLM_MODEL` permanece como padrão.
+Criar conexões, editar combos e gerenciar credenciais ocorre no painel
+OmniRoute. Não há troca de configuração global durante uma conversa.
+
+O agente usa as mesmas ferramentas e confirmação de ações. O gateway
+controla os fallbacks configurados; o cliente Jarvis não adiciona retries.
+A consulta de catálogo não prova que uma inferência funciona. Teste uma
+conversa depois de conectar os provedores.
+
+Para o serviço híbrido, configure o `.env` em `examples/hybrid`, usando
+`http://host.docker.internal:20128/v1` quando o gateway roda no host e é
+alcançável pelo contêiner. Os embeddings híbridos ainda usam Ollama; mudar
+o provedor de chat não muda o modelo vetorial.
+
+Se o navegador mostrar conexão recusada, o servidor não está acessível no
+endereço informado. Inicie a opção 5 e aguarde a mensagem do Uvicorn.
+API_TOKEN ausente ou curto agora produz uma explicação direta no terminal.
+Não feche a janela do servidor enquanto usa o painel.
+
+## Melhorias para teste: conversa, voz e inicialização
+
+O painel agora usa `/chat/stream` autenticado, com tokens progressivos reais
+do modelo. A seleção de modelo vale para o pedido, sem alterar o `.env`
+em execução ou compartilhar configuração mutável entre sessões. Apenas
+IDs do catálogo autenticado podem substituir o modelo padrão. Combos e
+credenciais continuam no gateway. Rodadas intermediárias de ferramentas
+podem substituir o texto provisório; a mensagem final é a confirmada.
+
+As conversas concluídas são persistidas em `data/conversations.sqlite3`
+(até 64 sessões por proprietário, 30 pares por sessão). O histórico permite
+reabrir conversas após reiniciar o servidor. Limpar conversa remove seus
+registros e revoga ações pendentes; preferências RAG permanecem separadas.
+O histórico é local e não criptografado. O histórico armazena apenas o texto enviado e a resposta final, sem os campos
+de tokens das ações ou da configuração. Cancelamento não desfaz uma ação já confirmada.
+
+O seletor fica sobre a conversa, acompanhado de Nova conversa e Interromper.
+Modo foco amplia a área de diálogo. A interface foi ajustada para celular.
+Voz contínua é opcional: após consentimento, o reconhecimento do navegador
+envia a transcrição e a detecção de início de fala interrompe a síntese e
+a requisição ativa. Use fones para evitar reconhecimento do próprio áudio.
+A disponibilidade e qualidade dependem do navegador; isso não substitui o
+Whisper desktop nem fornece VAD neural local. Interromper também desativa
+a escuta contínua. O fechamento do stream cancela a tarefa no servidor.
+
+A opção 5 reserva uma porta livre entre API_PORT e API_PORT+9 antes de
+carregar os modelos, imprime o endereço real e abre o navegador após
+`/health` responder. Um API_TOKEN ausente/curto é gerado e salvo no `.env`.
+Se OmniRoute estiver configurado em localhost mas não estiver escutando,
+o launcher tenta iniciar o comando `omniroute` já instalado no PATH.
+Não instala o gateway nem altera suas credenciais; confira sua janela.
+A configuração de API_TOKEN válida é preservada.
+
+Roteiro: iniciar opção 5; conectar; selecionar modelo; enviar mensagem e
+observar tokens; interromper; abrir nova conversa; reabrir histórico;
+reiniciar e reabrir histórico; testar voz com fones e consentimento; ocupar
+a porta padrão com outro serviço e confirmar o endereço alternativo.
+
+## Visão, debugger, memória JSON e automação desktop
+
+Atualize a branch `architecture/hybrid-realtime`, instale `requirements.txt` novamente
+(Pillow e psutil são novos) e execute `JARVIS.bat`, opção 5.
+
+- **Lembrar neste navegador:** conecte uma vez com API_TOKEN e marque a opção.
+  Uma sessão revogável dura 30 dias e sobrevive ao reinício. A chave do OmniRoute
+  continua somente no `.env`; ela não é gravada no navegador. Desconectar revoga
+  a sessão. Trocar API_TOKEN invalida todas as sessões anteriores.
+- **Visão e debugger:** escolha um modelo que aceite imagens, clique em compartilhar
+  tela e selecione a janela no navegador. Analise uma captura ou ative a repetição
+  opcional (15 segundos após cada resposta). Cada captura é enviada ao provedor
+  selecionado; a aplicação não salva screenshots. Pare o compartilhamento ao terminar.
+  A latência depende do gateway/modelo. Para erros, também pode colar o traceback
+  sem compartilhar tela. A análise sugere correções; não executa código.
+- **Memória JSON:** salve preferências, dicas e erros resolvidos no painel.
+  O arquivo `data/knowledge.json` usa substituição atômica e limite de 500 registros.
+  O agente recupera até quatro notas relevantes por turno. Essa memória complementa
+  ChromaDB e o histórico SQLite; não substitui esses armazenamentos. Arquivos JSON
+  corrompidos são preservados para recuperação, em vez de sobrescritos.
+- **Gamer e produtividade:** abra a configuração de aplicativos, detecte instalações,
+  revise os caminhos e salve. A detecção procura Steam, Discord e Opera GX em caminhos
+  comuns; instalações diferentes podem ser cadastradas no JSON do painel.
+  O arquivo persistido é `data/desktop.json`, com `apps`, `profiles` e `repos`.
+  Peça no chat: “abra o perfil gamer” ou “feche o perfil produtividade”. Revise a
+  proposta e confirme. Fechar solicita WM_CLOSE: aplicativos podem pedir para salvar
+  ou permanecer na bandeja. O assistente não força o encerramento.
+- **Git:** cadastre a raiz do repositório em `repos`. Use o painel ou peça ao chat
+  para adicionar arquivos específicos ao stage; depois solicite um commit com mensagem.
+  A revisão expira em 120 segundos, é de uso único e rejeita arquivos alterados desde
+  a proposta. Arquivos `.env`, caminhos externos e diretórios inteiros são recusados.
+  O commit inclui o stage revisado, usa a identidade e os hooks locais do Git e não
+  faz push. Configure `git config user.name` e `git config user.email` previamente.
+- **OmniRoute no mesmo navegador:** consulte e selecione modelos no próprio Jarvis.
+  O inicializador usa `omniroute serve --no-open` para evitar uma segunda aba.
+  A administração do gateway abre na mesma aba; use Voltar para retornar ao Jarvis.
+  A sessão lembrada reconecta automaticamente. A administração completa não é
+  embutida em iframe, pois o gateway bloqueia esse uso. Captura e voz param ao sair.
+
+A automação desktop deve rodar no Windows do usuário. Um backend em Docker/Linux
+não controla os aplicativos do Windows. Compartilhamento de tela requer navegador
+compatível em localhost ou HTTPS. Os testes automatizados usam respostas simuladas
+para visão/LLM; valide seu modelo e os aplicativos físicos na máquina de destino.
+
+
+## Presença visual e tempo de resposta
+
+O centro do painel tem um avatar vetorial holográfico. Clique em **Conversar por voz**
+para habilitar ditado contínuo e leitura das respostas; confirme o acesso ao áudio.
+Os estados são: pronto, ouvindo, processando, recebendo texto, falando e falha.
+A animação da boca é estilizada, vinculada ao início/fim da voz; não é sincronização
+fonética nem medição do volume do microfone. Use fones para evitar realimentação
+da voz sintetizada. **Interromper** cancela voz e requisição ativa. A voz depende
+do suporte e das vozes PT-BR instaladas/disponíveis no navegador.
+
+As buscas vetorial e JSON agora ocorrem em paralelo, com orçamento individual
+`MEMORY_RECALL_TIMEOUT=1.5` segundos (configurável no `.env`). Em caso de atraso,
+a resposta continua e informa qual memória ficou indisponível naquele turno.
+Os dados persistidos não são apagados. A primeira resposta após início pode precisar
+de aquecimento; aumente esse orçamento se priorizar a recuperação sobre a latência.
+
+Tokens continuam aparecendo progressivamente. A resposta final é enviada para fala
+antes da gravação do histórico; textos intermediários de chamadas de ferramentas
+não são lidos. O painel mostra o tempo real até o primeiro texto desde o envio,
+incluindo rede e gateway. O canvas foi reduzido a 80 pontos e limitado a 30 fps,
+pausando em aba oculta; a preferência do sistema por movimento reduzido é respeitada.
+
+Essas mudanças removem esperas locais, mas não garantem resposta instantânea: o
+modelo/combo escolhido, filas do OmniRoute, aquecimento, ferramentas e conexão
+continuam influenciando o tempo. Não reduzimos REQUEST_TIMEOUT para simular rapidez.

@@ -12,6 +12,16 @@ class ModelFactory:
     @staticmethod
     def create(settings: Settings) -> Any:
         """Build a model with bounded output, explicit timeout and no hidden retry loop."""
+        if settings.llm_provider == "omniroute":
+            from langchain_openai import ChatOpenAI
+
+            if not settings.omniroute_api_key or not settings.omniroute_api_key.get_secret_value():
+                raise JarvisError("Configure OMNIROUTE_API_KEY com a chave gerada no painel OmniRoute.")
+            return ChatOpenAI(model=settings.llm_model, api_key=settings.omniroute_api_key,
+                              base_url=settings.omniroute_base_url,
+                              max_tokens=settings.llm_max_tokens,
+                              timeout=settings.request_timeout, max_retries=0,
+                              use_responses_api=False)
         if settings.llm_provider == "openai":
             from langchain_openai import ChatOpenAI
 

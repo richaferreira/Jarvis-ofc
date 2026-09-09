@@ -1,0 +1,66 @@
+services:
+  agent:
+    build: .
+    env_file: .env
+    ports: ["127.0.0.1:8000:8000"]
+    extra_hosts: ["host.docker.internal:host-gateway"]
+    depends_on:
+      chroma:
+        condition: service_started
+      neo4j:
+        condition: service_healthy
+      mqtt:
+        condition: service_started
+    networks: [backend, egress]
+    restart: unless-stopped
+    init: true
+    read_only: true
+    tmpfs: ["/tmp"]
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s
+  chroma:
+    image: chromadb/chroma:1.5.9
+    volumes: ["chroma_data:/data"]
+    environment:
+      ANONYMIZED_TELEMETRY: "False"
+    networks: [backend]
+    restart: unless-stopped
+  neo4j:
+    image: neo4j:5.26-community
+    environment:
+      NEO4J_AUTH: "neo4j/${NEO4J_PASSWORD:?Configure NEO4J_PASSWORD no .env}"
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache_size: 512m
+    volumes: ["neo4j_data:/data"]
+    networks: [backend]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "bash -c 'echo > /dev/tcp/127.0.0.1/7687'"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
+  mqtt:
+    image: eclipse-mosquitto:2.0
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      - ./mosquitto/acl:/mosquitto/config/acl:ro
+      - ./mosquitto/passwords:/mosquitto/config/passwords:ro
+      - mqtt_data:/mosquitto/data
+    networks: [backend]
+    restart: unless-stopped
+networks:
+  backend:
+    internal: true
+  egress: {}
+volumes:
+  chroma_data: {}
+  neo4j_data: {}
+  mqtt_data: {}

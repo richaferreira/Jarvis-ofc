@@ -31,3 +31,6 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "function"
 testpaths = ["tests"]
 pythonpath = ["."]
+
+[tool.setuptools.package-data]
+app = ["web/*.html", "web/*.css", "web/*.js"]

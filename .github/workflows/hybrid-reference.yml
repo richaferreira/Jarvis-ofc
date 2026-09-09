@@ -1,0 +1,55 @@
+name: Hybrid reference
+on:
+  push:
+    branches: [architecture/hybrid-realtime]
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: examples/hybrid
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - run: python -m pip install uv==0.10.0
+      - run: uv lock --check
+      - run: uv sync --locked
+      - run: uv run --locked python -m compileall -q hybrid
+      - run: uv run --locked mypy hybrid
+      - run: uv run --locked pytest -q
+      - run: uv run --locked ruff check ../../app
+      - run: python -S -m app.main --help
+        working-directory: .
+      - run: uv export --locked --no-dev --no-emit-project --format requirements-txt > requirements.lock
+      - uses: actions/upload-artifact@v4
+        with:
+          name: hybrid-locked-dependencies
+          path: |
+            examples/hybrid/uv.lock
+            examples/hybrid/requirements.lock
+      - run: docker build -t jarvis-hybrid-reference .
+      - name: Prepare isolated CI credentials
+        run: |
+          cat > .env <<'ENV'
+          OWNER=casa01
+          API_TOKEN=ci-only-api-token-not-for-deployment-0123456789
+          NEO4J_PASSWORD=ci-only-database-password
+          MQTT_PASSWORD=ci-only-mqtt-password
+          ENV
+          docker run --rm -v "$PWD/mosquitto:/mosquitto/config" eclipse-mosquitto:2.0 mosquitto_passwd -b -c /mosquitto/config/passwords jarvis ci-only-mqtt-password
+          docker run --rm -v "$PWD/mosquitto:/mosquitto/config" eclipse-mosquitto:2.0 mosquitto_passwd -b /mosquitto/config/passwords bridge ci-only-mqtt-password
+          sudo chmod 644 mosquitto/passwords
+      - run: docker compose up -d --wait --wait-timeout 180
+      - run: docker compose exec -T agent python - < tests/smoke_compose.py
+      - name: Container diagnostics on failure
+        if: failure()
+        run: docker compose logs --tail=80
+      - name: Remove isolated test services
+        if: always()
+        run: docker compose down -v

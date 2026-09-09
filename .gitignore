@@ -15,3 +15,7 @@ build/
 dist/
 *.log
 .DS_Store
+
+# Realtime reference: broker credential database
+examples/hybrid/mosquitto/passwords
+.mypy_cache/
